@@ -23,6 +23,5 @@ from magnum_capi_helm.tests import base
 
 
 class TestMagnum_capi_helm(base.TestCase):
-
     def test_something(self):
         pass
