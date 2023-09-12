@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
 # not use this file except in compliance with the License. You may obtain
 # a copy of the License at
@@ -12,16 +10,13 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-"""
-test_magnum_capi_helm
-----------------------------------
+from magnum.drivers.common import driver as common
 
-Tests for `magnum_capi_helm` module.
-"""
-
+from magnum_capi_helm import driver
 from magnum_capi_helm.tests import base
 
 
-class TestMagnum_capi_helm(base.TestCase):
-    def test_something(self):
-        pass
+class TestMagnumDriverLoads(base.TestCase):
+    def test_get_driver(self):
+        cluster_driver = common.Driver.get_driver("vm", "ubuntu", "kubernetes")
+        self.assertIsInstance(cluster_driver, driver.Driver)
