@@ -26,7 +26,46 @@ capi_helm_opts = [
             "Defaults to the environment variable KUBECONFIG, "
             "or if not defined ~/.kube/config"
         ),
-    )
+    ),
+    cfg.StrOpt(
+        "namespace_suffix",
+        default="magnum",
+        help=(
+            "Resources for each openstack cluster are created in a "
+            "separate namespace within the CAPI Management cluster "
+            "specified by the configuration: [capi_helm]kubeconfig_file "
+            "You should modify this suffix when two magnum deployments "
+            "want to share a single CAPI management cluster."
+        ),
+    ),
+    cfg.StrOpt(
+        "helm_chart_repo",
+        default="https://stackhpc.github.io/capi-helm-charts",
+        help=(
+            "Reference to the helm chart repository for "
+            "the cluster API driver. "
+            "Note that if helm_chart_name starts with oci:// "
+            "you will want this to set this to the empty string."
+        ),
+    ),
+    cfg.StrOpt(
+        "helm_chart_name",
+        default="openstack-cluster",
+        help=(
+            "Name of the helm chart to use from the repo specified "
+            "by the config: capi_driver.helm_chart_repo"
+        ),
+    ),
+    cfg.StrOpt(
+        "default_helm_chart_version",
+        default="0.1.1-dev.0.main.221",
+        help=(
+            "Version of the helm chart specified "
+            "by the config: capi_driver.helm_chart_repo "
+            "and capi_driver.helm_chart_name. "
+            "A cluster label can override this."
+        ),
+    ),
 ]
 
 CONF = cfg.CONF
