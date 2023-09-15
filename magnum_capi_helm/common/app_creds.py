@@ -16,14 +16,18 @@
 # This code is making use of the good work done here:
 # https://github.com/vexxhost/magnum-cluster-api/blob/main/magnum_cluster_api/resources.py
 
-import certifi
 import yaml
+
+import certifi
+import keystoneauth1
+from oslo_log import log as logging
 
 from magnum.common import clients
 from magnum.common import utils
 import magnum.conf
 
 CONF = magnum.conf.CONF
+LOG = logging.getLogger(__name__)
 
 
 def _get_openstack_ca_certificate():
@@ -81,3 +85,19 @@ def get_app_cred_string_data(context, cluster):
         "cacert": _get_openstack_ca_certificate(),
         "clouds.yaml": clouds_yaml_str,
     }
+
+
+def delete_app_cred(context, cluster):
+    osc = clients.OpenStackClients(context)
+    try:
+        appcred = osc.keystone().client.application_credentials.find(
+            name=f"magnum-{cluster.uuid}", user=cluster.user_id
+        )
+    except keystoneauth1.exceptions.http.NotFound:
+        # We don't want this to be a failure condition as it may prevent
+        # cleanup of broken clusters, e.g. if cluster creation fails
+        # before the appcred is created or cluster deletion fails after
+        # the appcred is deleted
+        LOG.warning("Appcred does not exist for %s", cluster.uuid)
+    else:
+        appcred.delete()
