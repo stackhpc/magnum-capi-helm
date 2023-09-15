@@ -46,7 +46,13 @@ class ClusterAPIDriverTest(base.DbTestCase):
 
     def test_provides(self):
         self.assertEqual(
-            [{"server_type": "vm", "os": "ubuntu", "coe": "kubernetes"}],
+            [
+                {
+                    "server_type": "vm",
+                    "os": "capi-kubeadm-cloudinit",
+                    "coe": "kubernetes",
+                }
+            ],
             self.driver.provides,
         )
 
