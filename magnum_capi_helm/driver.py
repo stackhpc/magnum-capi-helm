@@ -9,6 +9,7 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
+import enum
 import re
 
 from magnum.api import utils as api_utils
@@ -16,6 +17,8 @@ from magnum.common import clients
 from magnum.common import exception
 from magnum.common import short_id
 from magnum.drivers.common import driver
+from magnum.drivers.common import k8s_monitor
+from magnum.objects import fields
 from oslo_log import log as logging
 
 from magnum_capi_helm.common import app_creds
@@ -26,6 +29,14 @@ from magnum_capi_helm import kubernetes
 
 LOG = logging.getLogger(__name__)
 CONF = conf.CONF
+NODE_GROUP_ROLE_CONTROLLER = "master"
+
+
+class NodeGroupState(enum.Enum):
+    NOT_PRESENT = 1
+    PENDING = 2
+    READY = 3
+    FAILED = 4
 
 
 class Driver(driver.Driver):
@@ -51,8 +62,304 @@ class Driver(driver.Driver):
             },
         ]
 
+    def _update_control_plane_nodegroup_status(self, cluster, nodegroup):
+        # The status of the master nodegroup is determined by the Cluster API
+        # control plane object
+        kcp = self._k8s_client.get_kubeadm_control_plane(
+            self._sanitized_name(
+                self._get_chart_release_name(cluster), "control-plane"
+            ),
+            self._namespace(cluster),
+        )
+
+        ng_state = NodeGroupState.NOT_PRESENT
+        if kcp:
+            ng_state = NodeGroupState.PENDING
+
+        kcp_spec = kcp.get("spec", {}) if kcp else {}
+        kcp_status = kcp.get("status", {}) if kcp else {}
+        kcp_true_conditions = {
+            cond["type"]
+            for cond in kcp_status.get("conditions", [])
+            if cond["status"] == "True"
+        }
+        kcp_ready = all(
+            cond in kcp_true_conditions
+            for cond in (
+                "MachinesReady",
+                "Ready",
+                "EtcdClusterHealthy",
+                "ControlPlaneComponentsHealthy",
+            )
+        )
+        target_replicas = kcp_spec.get("replicas")
+        current_replicas = kcp_status.get("replicas")
+        updated_replicas = kcp_status.get("updatedReplicas")
+        ready_replicas = kcp_status.get("readyReplicas")
+        if (
+            kcp_ready
+            and target_replicas == current_replicas
+            and current_replicas == updated_replicas
+            and updated_replicas == ready_replicas
+        ):
+            ng_state = NodeGroupState.READY
+
+        # TODO(mkjpryor) Work out a way to determine FAILED state
+        return self._update_nodegroup_status(cluster, nodegroup, ng_state)
+
+    def _update_worker_nodegroup_status(self, cluster, nodegroup):
+        # The status of a worker nodegroup is determined by the corresponding
+        # Cluster API machine deployment
+        md = self._k8s_client.get_machine_deployment(
+            self._sanitized_name(
+                self._get_chart_release_name(cluster), nodegroup.name
+            ),
+            self._namespace(cluster),
+        )
+
+        ng_state = NodeGroupState.NOT_PRESENT
+        if md:
+            ng_state = NodeGroupState.PENDING
+
+        md_status = md.get("status", {}) if md else {}
+        md_phase = md_status.get("phase")
+        if md_phase:
+            if md_phase == "Running":
+                ng_state = NodeGroupState.READY
+            elif md_phase in {"Failed", "Unknown"}:
+                ng_state = NodeGroupState.FAILED
+
+        return self._update_nodegroup_status(cluster, nodegroup, ng_state)
+
+    def _update_nodegroup_status(self, cluster, nodegroup, ng_state):
+        # For delete we are waiting for not present
+        if nodegroup.status.startswith("DELETE_"):
+            if ng_state == NodeGroupState.NOT_PRESENT:
+                # Conductor will delete default nodegroups
+                # when cluster is deleted
+                LOG.debug(
+                    f"Node group deleted: {nodegroup.name} "
+                    f"for cluster {cluster.uuid}"
+                )
+                # signal the node group has been deleted
+                return None
+
+            LOG.debug(
+                f"Node group not yet delete: {nodegroup.name} "
+                f"for cluster {cluster.uuid}"
+            )
+            return nodegroup
+
+        is_update_operation = nodegroup.status.startswith("UPDATE_")
+        is_create_operation = nodegroup.status.startswith("CREATE_")
+        if not is_update_operation and not is_create_operation:
+            LOG.warning(
+                f"Node group: {nodegroup.name} in unexpected "
+                f"state: {nodegroup.status} in cluster {cluster.uuid}"
+            )
+        elif ng_state == NodeGroupState.READY:
+            nodegroup.status = (
+                fields.ClusterStatus.UPDATE_COMPLETE
+                if is_update_operation
+                else fields.ClusterStatus.CREATE_COMPLETE
+            )
+            LOG.debug(
+                f"Node group ready: {nodegroup.name} "
+                f"in cluster {cluster.uuid}"
+            )
+            nodegroup.save()
+
+        elif ng_state == NodeGroupState.FAILED:
+            nodegroup.status = (
+                fields.ClusterStatus.UPDATE_FAILED
+                if is_update_operation
+                else fields.ClusterStatus.CREATE_FAILED
+            )
+            LOG.debug(
+                f"Node group failed: {nodegroup.name} "
+                f"in cluster {cluster.uuid}"
+            )
+            nodegroup.save()
+        elif ng_state == NodeGroupState.NOT_PRESENT:
+            LOG.debug(
+                f"Node group not yet found: {nodegroup.name} "
+                f"state:{nodegroup.status} in cluster {cluster.uuid}"
+            )
+        else:
+            LOG.debug(
+                f"Node group still pending: {nodegroup.name} "
+                f"state:{nodegroup.status} in cluster {cluster.uuid}"
+            )
+
+        return nodegroup
+
+    def _update_cluster_api_address(self, cluster, capi_cluster):
+        # As soon as we know the API address, we should set it
+        # This means users can access the API even if the create is
+        # not complete, which could be useful for debugging failures,
+        # e.g. with addons
+        if not capi_cluster:
+            # skip update if cluster not yet created
+            return
+
+        if cluster.status not in [
+            fields.ClusterStatus.CREATE_IN_PROGRESS,
+            fields.ClusterStatus.UPDATE_IN_PROGRESS,
+        ]:
+            # only update api-address when updating or creating
+            return
+
+        api_endpoint = capi_cluster["spec"].get("controlPlaneEndpoint")
+        if api_endpoint:
+            api_address = (
+                f"https://{api_endpoint['host']}:{api_endpoint['port']}"
+            )
+            if cluster.api_address != api_address:
+                cluster.api_address = api_address
+                cluster.save()
+                LOG.debug(f"Found api_address for {cluster.uuid}")
+
+    def _update_status_updating(self, cluster, capi_cluster):
+        # If the cluster is not yet ready then the create/update
+        # is still in progress
+        true_conditions = {
+            cond["type"]
+            for cond in capi_cluster.get("status", {}).get("conditions", [])
+            if cond["status"] == "True"
+        }
+        for cond in ("InfrastructureReady", "ControlPlaneReady", "Ready"):
+            if cond not in true_conditions:
+                return
+
+        is_update_operation = cluster.status.startswith("UPDATE_")
+
+        # Check the status of the addons
+        addons = self._k8s_client.get_addons_by_label(
+            "addons.stackhpc.com/cluster",
+            self._sanitized_name(self._get_chart_release_name(cluster)),
+            self._namespace(cluster),
+        )
+        for addon in addons:
+            addon_phase = addon.get("status", {}).get("phase")
+            if addon_phase and addon_phase in {"Failed", "Unknown"}:
+                # If the addon is failed, mark the cluster as failed
+                cluster.status = (
+                    fields.ClusterStatus.UPDATE_FAILED
+                    if is_update_operation
+                    else fields.ClusterStatus.CREATE_FAILED
+                )
+                cluster.save()
+                return
+            elif addon_phase and addon_phase == "Deployed":
+                # If the addon is deployed, move on to the next one
+                continue
+            else:
+                # If there are any addons that are not deployed or failed,
+                # wait for the next invocation to check again
+                LOG.debug(
+                    f"addon {addon['metadata']['name']} not yet deployed "
+                    f"for {cluster.uuid}"
+                )
+                return
+
+        # If we get this far, the cluster has completed successfully
+        cluster.status = (
+            fields.ClusterStatus.UPDATE_COMPLETE
+            if is_update_operation
+            else fields.ClusterStatus.CREATE_COMPLETE
+        )
+        cluster.save()
+
+    def _update_status_deleting(self, context, cluster):
+        # Once the Cluster API cluster is gone, we need to clean up
+        # the secrets we created
+        self._k8s_client.delete_all_secrets_by_label(
+            "magnum.openstack.org/cluster-uuid",
+            cluster.uuid,
+            self._namespace(cluster),
+        )
+
+        # We also need to clean up the appcred that we made
+        app_creds.delete_app_cred(context, cluster)
+
+        cluster.status = fields.ClusterStatus.DELETE_COMPLETE
+        cluster.save()
+
+    def _get_capi_cluster(self, cluster):
+        return self._k8s_client.get_capi_cluster(
+            self._sanitized_name(self._get_chart_release_name(cluster)),
+            self._namespace(cluster),
+        )
+
+    def _update_all_nodegroups_status(self, cluster):
+        """Returns True if any node group still in progress."""
+        nodegroups = []
+        for nodegroup in cluster.nodegroups:
+            if nodegroup.role == NODE_GROUP_ROLE_CONTROLLER:
+                updated_nodegroup = (
+                    self._update_control_plane_nodegroup_status(
+                        cluster, nodegroup
+                    )
+                )
+            else:
+                updated_nodegroup = self._update_worker_nodegroup_status(
+                    cluster, nodegroup
+                )
+            if updated_nodegroup:
+                nodegroups.append(updated_nodegroup)
+
+        # Return True if any are still in progress
+        for nodegroup in nodegroups:
+            if nodegroup.status.endswith("_IN_PROGRESS"):
+                return True
+        return False
+
     def update_cluster_status(self, context, cluster):
-        raise NotImplementedError("don't support update_cluster_status yet")
+        # NOTE(mkjpryor)
+        # Because Kubernetes operators are built around reconciliation loops,
+        # Cluster API clusters don't really go into an error state
+        # Hence we only currently handle transitioning from IN_PROGRESS
+        # states to COMPLETE
+
+        # TODO(mkjpryor) Add a timeout for create/update/delete
+
+        # Update the cluster API address if it is known
+        # so users can get their coe credentials
+        capi_cluster = self._get_capi_cluster(cluster)
+        self._update_cluster_api_address(cluster, capi_cluster)
+
+        # Update the nodegroups first
+        # to ensure API never returns an inconsistent state
+        nodegroups_in_progress = self._update_all_nodegroups_status(cluster)
+
+        if cluster.status in {
+            fields.ClusterStatus.CREATE_IN_PROGRESS,
+            fields.ClusterStatus.UPDATE_IN_PROGRESS,
+        }:
+            LOG.debug("Checking on an update for %s", cluster.uuid)
+            # If the cluster does not exist yet,
+            # create is still in progress
+            if not capi_cluster:
+                LOG.debug(f"capi_cluster not yet created for {cluster.uuid}")
+                return
+            if nodegroups_in_progress:
+                LOG.debug(f"Node groups are not all ready for {cluster.uuid}")
+                return
+            self._update_status_updating(cluster, capi_cluster)
+
+        elif cluster.status == fields.ClusterStatus.DELETE_IN_PROGRESS:
+            LOG.debug("Checking on a delete for %s", cluster.uuid)
+            # If the Cluster API cluster still exists,
+            # the delete is still in progress
+            if capi_cluster:
+                LOG.debug(f"capi_cluster still found for {cluster.uuid}")
+                return
+            self._update_status_deleting(context, cluster)
+
+    def get_monitor(self, context, cluster):
+        # re-use the monitor from the old heat driver,
+        # even though it requires access from magnum conductor
+        return k8s_monitor.K8sMonitor(context, cluster)
 
     def _namespace(self, cluster):
         # We create clusters in a project-specific namespace
@@ -262,6 +569,8 @@ class Driver(driver.Driver):
         # and it makes renaming clusters in the API possible
         self._generate_release_name(cluster)
 
+        # NOTE(johngarbutt) all node groups should already
+        # be in the CREATE_IN_PROGRESS state
         self._k8s_client.ensure_namespace(self._namespace(cluster))
         self._create_appcred_secret(context, cluster)
         self._ensure_certificate_secrets(context, cluster)
@@ -275,6 +584,15 @@ class Driver(driver.Driver):
 
     def delete_cluster(self, context, cluster):
         LOG.info("Starting to delete cluster %s", cluster.uuid)
+
+        # Copy the helm driver by marking all node groups
+        # as delete in progress here, as note done by conductor
+        # We do this before calling uninstall_release because
+        # update_cluster_status can get called before we return
+        for ng in cluster.nodegroups:
+            ng.status = fields.ClusterStatus.DELETE_IN_PROGRESS
+            ng.save()
+
         # Begin the deletion of the cluster resources by uninstalling the
         # Helm release
         # Note that this just marks the resources for deletion - it does not
