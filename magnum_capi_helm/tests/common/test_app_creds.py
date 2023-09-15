@@ -97,14 +97,12 @@ class TestAppCreds(base.DbTestCase):
         app_cred = app_creds.get_app_cred_string_data("context", "cluster")
 
         expected = {
-            "stringData": {
-                "cacert": "cacert",
-                "clouds.yaml": """\
+            "cacert": "cacert",
+            "clouds.yaml": """\
 clouds:
   openstack:
     auth:
       application_credential_id: id
 """,
-            }
         }
         self.assertEqual(expected, app_cred)

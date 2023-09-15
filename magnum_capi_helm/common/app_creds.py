@@ -78,8 +78,6 @@ def get_app_cred_string_data(context, cluster):
     app_cred_dict = _create_app_cred(context, cluster)
     clouds_yaml_str = yaml.safe_dump(app_cred_dict)
     return {
-        "stringData": {
-            "cacert": _get_openstack_ca_certificate(),
-            "clouds.yaml": clouds_yaml_str,
-        }
+        "cacert": _get_openstack_ca_certificate(),
+        "clouds.yaml": clouds_yaml_str,
     }
