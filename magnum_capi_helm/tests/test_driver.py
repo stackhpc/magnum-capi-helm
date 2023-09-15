@@ -1387,16 +1387,23 @@ class ClusterAPIDriverTest(base.DbTestCase):
         )
         mock_update.assert_called_once_with(self.context, self.cluster_obj)
 
-    def test_upgrade_cluster(self):
-        self.assertRaises(
-            NotImplementedError,
-            self.driver.upgrade_cluster,
+    @mock.patch.object(driver.Driver, "_update_helm_release")
+    def test_upgrade_cluster(self, mock_update):
+        node_group = mock.MagicMock()
+        mock_template = mock.MagicMock()
+        mock_template.uuid = "foo"
+
+        self.driver.upgrade_cluster(
             self.context,
             self.cluster_obj,
-            self.cluster_obj.cluster_template,
+            mock_template,
             1,
-            None,
+            node_group,
         )
+
+        # TODO(johngarbutt) improve the testing
+        mock_update.assert_called_once_with(self.context, self.cluster_obj)
+        self.assertEqual("UPDATE_IN_PROGRESS", self.cluster_obj.status)
 
     @mock.patch.object(driver.Driver, "_update_helm_release")
     def test_create_nodegroup(self, mock_update):

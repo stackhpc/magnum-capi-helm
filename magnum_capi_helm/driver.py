@@ -78,6 +78,14 @@ class Driver(driver.Driver):
 
         kcp_spec = kcp.get("spec", {}) if kcp else {}
         kcp_status = kcp.get("status", {}) if kcp else {}
+
+        # The control plane object is what controls the Kubernetes version
+        # If it is known, report it
+        kube_version = kcp_status.get("version", kcp_spec.get("version"))
+        if cluster.coe_version != kube_version:
+            cluster.coe_version = kube_version
+            cluster.save()
+
         kcp_true_conditions = {
             cond["type"]
             for cond in kcp_status.get("conditions", [])
@@ -669,7 +677,22 @@ class Driver(driver.Driver):
         scale_manager=None,
         rollback=False,
     ):
-        raise NotImplementedError("don't support upgrade yet")
+        # TODO(mkjpryor) check that the upgrade is viable
+        # e.g. not a downgrade, not an upgrade by more than one minor version
+
+        # Updating the template will likely apply for all nodegroups
+        # So mark them all as having an update in progress
+        for nodegroup in cluster.nodegroups:
+            nodegroup.status = fields.ClusterStatus.UPDATE_IN_PROGRESS
+            nodegroup.save()
+
+        # Move the cluster to the new template
+        cluster.cluster_template_id = cluster_template.uuid
+        cluster.status = fields.ClusterStatus.UPDATE_IN_PROGRESS
+        cluster.save()
+        cluster.refresh()
+
+        self._update_helm_release(context, cluster)
 
     def create_nodegroup(self, context, cluster, nodegroup):
         nodegroup.status = fields.ClusterStatus.CREATE_IN_PROGRESS
@@ -692,9 +715,7 @@ class Driver(driver.Driver):
         self._update_helm_release(
             context,
             cluster,
-            list(
-                [ng for ng in cluster.nodegroups if ng.name != nodegroup.name]
-            ),
+            [ng for ng in cluster.nodegroups if ng.name != nodegroup.name],
         )
 
     def create_federation(self, context, federation):
