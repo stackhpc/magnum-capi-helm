@@ -24,6 +24,10 @@ from magnum_capi_helm import conf
 LOG = logging.getLogger(__name__)
 CONF = conf.CONF
 
+# This code is loosely based on:
+#  https://github.com/stackhpc/pyhelm3
+#  Ideally we can share this code in the future.
+
 
 def mergeconcat(defaults, *overrides):
     """Deep-merge two or more dictionaries together.
