@@ -16,9 +16,13 @@ from magnum import objects
 from magnum.tests.unit.db import base
 from magnum.tests.unit.objects import utils as obj_utils
 
+from magnum_capi_helm.common import app_creds
+from magnum_capi_helm.common import ca_certificates
 from magnum_capi_helm import conf
 from magnum_capi_helm import driver
 from magnum_capi_helm import helm
+from magnum_capi_helm import kubernetes
+
 
 CONF = conf.CONF
 
@@ -198,14 +202,22 @@ class ClusterAPIDriverTest(base.DbTestCase):
 
         self.assertEqual("1.42.0", version)
 
+    @mock.patch.object(driver.Driver, "_ensure_certificate_secrets")
+    @mock.patch.object(driver.Driver, "_create_appcred_secret")
+    @mock.patch.object(kubernetes.Client, "load")
     @mock.patch.object(driver.Driver, "_get_image_details")
     @mock.patch.object(helm.Client, "install_or_upgrade")
     def test_create_cluster(
         self,
         mock_install,
         mock_image,
+        mock_load,
+        mock_appcred,
+        mock_certs,
     ):
         mock_image.return_value = ("imageid1", "1.27.4")
+        mock_client = mock.MagicMock(spec=kubernetes.Client)
+        mock_load.return_value = mock_client
 
         self.cluster_obj.keypair = "kp1"
 
@@ -248,6 +260,75 @@ class ClusterAPIDriverTest(base.DbTestCase):
             repo=CONF.capi_helm.helm_chart_repo,
             version=CONF.capi_helm.default_helm_chart_version,
             namespace="magnum-fakeproject",
+        )
+        mock_client.ensure_namespace.assert_called_once_with(
+            "magnum-fakeproject"
+        )
+        mock_appcred.assert_called_once_with(self.context, self.cluster_obj)
+        mock_certs.assert_called_once_with(self.context, self.cluster_obj)
+
+    @mock.patch.object(app_creds, "get_app_cred_string_data")
+    @mock.patch.object(kubernetes.Client, "load")
+    def test_create_appcred_secret(self, mock_load, mock_sd):
+        mock_client = mock.MagicMock(spec=kubernetes.Client)
+        mock_load.return_value = mock_client
+        mock_sd.return_value = {"cacert": "ca", "clouds.yaml": "appcred"}
+
+        self.driver._create_appcred_secret(self.context, self.cluster_obj)
+
+        uuid = self.cluster_obj.uuid
+        mock_client.apply_secret.assert_called_once_with(
+            "cluster-example-a-111111111111-cloud-credentials",
+            {
+                "metadata": {
+                    "labels": {
+                        "magnum.openstack.org/project-id": "fake_project",
+                        "magnum.openstack.org/user-id": "fake_user",
+                        "magnum.openstack.org/cluster-uuid": uuid,
+                    }
+                },
+                "stringData": {"cacert": "ca", "clouds.yaml": "appcred"},
+            },
+            "magnum-fakeproject",
+        )
+
+    @mock.patch.object(ca_certificates, "get_certificate_string_data")
+    @mock.patch.object(driver.Driver, "_k8s_resource_labels")
+    @mock.patch.object(kubernetes.Client, "load")
+    def test_ensure_certificate_secrets(
+        self, mock_load, mock_labels, mock_string_data
+    ):
+        mock_client = mock.MagicMock(spec=kubernetes.Client)
+        mock_load.return_value = mock_client
+        mock_labels.return_value = dict(foo="bar")
+        mock_string_data.return_value = {
+            "ca": {"tls.crt": "cert1", "tls.key": "key1"},
+            "proxy": {"tls.crt": "cert2", "tls.key": "key2"},
+        }
+
+        self.driver._ensure_certificate_secrets(self.context, self.cluster_obj)
+
+        mock_client.apply_secret.assert_has_calls(
+            [
+                mock.call(
+                    "cluster-example-a-111111111111-ca",
+                    {
+                        "metadata": {"labels": {"foo": "bar"}},
+                        "type": "cluster.x-k8s.io/secret",
+                        "stringData": {"tls.crt": "cert1", "tls.key": "key1"},
+                    },
+                    "magnum-fakeproject",
+                ),
+                mock.call(
+                    "cluster-example-a-111111111111-proxy",
+                    {
+                        "metadata": {"labels": {"foo": "bar"}},
+                        "type": "cluster.x-k8s.io/secret",
+                        "stringData": {"tls.crt": "cert2", "tls.key": "key2"},
+                    },
+                    "magnum-fakeproject",
+                ),
+            ]
         )
 
     @mock.patch.object(helm.Client, "uninstall_release")

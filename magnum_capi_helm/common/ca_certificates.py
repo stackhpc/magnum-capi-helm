@@ -56,10 +56,8 @@ def get_certificate_string_data(context, cluster):
     certificate_string_data = {}
     for name, cert in certificates.items():
         certificate_string_data[name] = {
-            "stringData": {
-                "tls.crt": _decode_cert(cert),
-                "tls.key": _decode_key(cert),
-            }
+            "tls.crt": _decode_cert(cert),
+            "tls.key": _decode_key(cert),
         }
 
     return certificate_string_data

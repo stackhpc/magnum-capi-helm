@@ -18,8 +18,11 @@ from magnum.common import short_id
 from magnum.drivers.common import driver
 from oslo_log import log as logging
 
+from magnum_capi_helm.common import app_creds
+from magnum_capi_helm.common import ca_certificates
 from magnum_capi_helm import conf
 from magnum_capi_helm import helm
+from magnum_capi_helm import kubernetes
 
 LOG = logging.getLogger(__name__)
 CONF = conf.CONF
@@ -28,6 +31,13 @@ CONF = conf.CONF
 class Driver(driver.Driver):
     def __init__(self):
         self._helm_client = helm.Client()
+        self.__k8s_client = None
+
+    @property
+    def _k8s_client(self):
+        if not self.__k8s_client:
+            self.__k8s_client = kubernetes.Client.load()
+        return self.__k8s_client
 
     @property
     def provides(self):
@@ -48,6 +58,52 @@ class Driver(driver.Driver):
         project_id = re.sub("[^a-z0-9]", "", cluster.project_id.lower())
         suffix = CONF.capi_helm.namespace_suffix
         return f"{suffix}-{project_id}"
+
+    def _k8s_resource_labels(self, cluster):
+        # TODO(johngarbutt) need to check these are safe labels
+        return {
+            "magnum.openstack.org/project-id": cluster.project_id[:63],
+            "magnum.openstack.org/user-id": cluster.user_id[:63],
+            "magnum.openstack.org/cluster-uuid": cluster.uuid[:63],
+        }
+
+    def _create_appcred_secret(self, context, cluster):
+        string_data = app_creds.get_app_cred_string_data(context, cluster)
+        name = self._get_app_cred_name(cluster)
+        self._k8s_client.apply_secret(
+            name,
+            {
+                "metadata": {"labels": self._k8s_resource_labels(cluster)},
+                "stringData": string_data,
+            },
+            self._namespace(cluster),
+        )
+
+    def _ensure_certificate_secrets(self, context, cluster):
+        # Magnum creates CA certs for each of the Kubernetes components that
+        # must be trusted by the cluster
+        # In particular, this is required for "openstack coe cluster config"
+        # to work, as that doesn't communicate with the driver and instead
+        # relies on the correct CA being trusted by the cluster
+
+        # Cluster API looks for specific named secrets for each of the CAs,
+        # and generates them if they don't exist, so we create them here
+        # with the correct certificates in
+        for (
+            name,
+            data,
+        ) in ca_certificates.get_certificate_string_data().items():
+            self._k8s_client.apply_secret(
+                self._sanitized_name(
+                    self._get_chart_release_name(cluster), name
+                ),
+                {
+                    "metadata": {"labels": self._k8s_resource_labels(cluster)},
+                    "type": "cluster.x-k8s.io/secret",
+                    "stringData": data,
+                },
+                self._namespace(cluster),
+            )
 
     def _label(self, cluster, key, default):
         all_labels = helm.mergeconcat(
@@ -117,7 +173,6 @@ class Driver(driver.Driver):
         values = {
             "kubernetesVersion": kube_version,
             "machineImageId": image_id,
-            # TODO(johngarbutt): need to generate app creds
             "cloudCredentialsSecretName": self._get_app_cred_name(cluster),
             # TODO(johngarbutt): need to respect requested networks
             "clusterNetworking": {
@@ -204,6 +259,10 @@ class Driver(driver.Driver):
         # so we hit no issues with duplicate cluster names
         # and it makes renaming clusters in the API possible
         self._generate_release_name(cluster)
+
+        self._k8s_client.ensure_namespace(self._namespace(cluster))
+        self._create_appcred_secret(context, cluster)
+        self._ensure_certificate_secrets(context, cluster)
 
         self._update_helm_release(context, cluster)
 

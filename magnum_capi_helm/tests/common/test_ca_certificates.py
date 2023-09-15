@@ -37,26 +37,18 @@ class TestCACerts(base.TestCase):
 
         self.assertEqual(
             {
-                "ca": {
-                    "stringData": {"tls.crt": "cert-ca", "tls.key": "key-ca"}
-                },
+                "ca": {"tls.crt": "cert-ca", "tls.key": "key-ca"},
                 "etcd": {
-                    "stringData": {
-                        "tls.crt": "cert-etcd",
-                        "tls.key": "key-etcd",
-                    }
+                    "tls.crt": "cert-etcd",
+                    "tls.key": "key-etcd",
                 },
                 "proxy": {
-                    "stringData": {
-                        "tls.crt": "cert-front_proxy",
-                        "tls.key": "key-front_proxy",
-                    }
+                    "tls.crt": "cert-front_proxy",
+                    "tls.key": "key-front_proxy",
                 },
                 "sa": {
-                    "stringData": {
-                        "tls.crt": "cert-cert_mag",
-                        "tls.key": "key-cert_mag",
-                    }
+                    "tls.crt": "cert-cert_mag",
+                    "tls.key": "key-cert_mag",
                 },
             },
             data,
