@@ -672,6 +672,24 @@ class Driver(driver.Driver):
             },
         }
 
+        # Sometimes you need to add an extra network
+        # for things like Cinder CSI CephFS Native
+        extra_network_name = self._label(cluster, "extra_network_name", "")
+        if extra_network_name:
+            values["nodeGroupDefaults"] = {
+                "machineNetworking": {
+                    "ports": [
+                        {},
+                        {
+                            "network": {
+                                "name": extra_network_name,
+                            },
+                            "securityGroups": [],
+                        },
+                    ]
+                }
+            }
+
         self._helm_client.install_or_upgrade(
             self._get_chart_release_name(cluster),
             CONF.capi_helm.helm_chart_name,
