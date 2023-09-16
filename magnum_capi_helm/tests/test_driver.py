@@ -12,6 +12,7 @@
 from unittest import mock
 
 from magnum.common import exception
+from magnum.common import neutron
 from magnum.drivers.common import k8s_monitor
 from magnum.objects import fields
 from magnum.tests.unit.db import base
@@ -1093,6 +1094,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
 
         self.assertEqual("1.42.0", version)
 
+    @mock.patch.object(neutron, "get_network")
     @mock.patch.object(driver.Driver, "_ensure_certificate_secrets")
     @mock.patch.object(driver.Driver, "_create_appcred_secret")
     @mock.patch.object(kubernetes.Client, "load")
@@ -1105,16 +1107,21 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_load,
         mock_appcred,
         mock_certs,
+        mock_get_net,
     ):
         mock_image.return_value = ("imageid1", "1.27.4")
         mock_client = mock.MagicMock(spec=kubernetes.Client)
         mock_load.return_value = mock_client
+        mock_get_net.side_effect = (
+            lambda c, net, source, target, external: f"{net}-{external}"
+        )
 
         self.cluster_obj.keypair = "kp1"
 
         self.driver.create_cluster(self.context, self.cluster_obj, 10)
 
         app_cred_name = "cluster-example-a-111111111111-cloud-credentials"
+        ext_net_id = self.cluster_obj.cluster_template.external_network_id
         mock_install.assert_called_once_with(
             "cluster-example-a-111111111111",
             "openstack-cluster",
@@ -1123,7 +1130,12 @@ class ClusterAPIDriverTest(base.DbTestCase):
                 "machineImageId": "imageid1",
                 "cloudCredentialsSecretName": app_cred_name,
                 "clusterNetworking": {
-                    "internalNetwork": {"nodeCidr": "10.0.0.0/24"},
+                    "externalNetworkId": ext_net_id,
+                    "internalNetwork": {
+                        "networkFilter": None,
+                        "subnetFilter": None,
+                        "nodeCidr": "10.0.0.0/24",
+                    },
                     "dnsNameservers": ["8.8.1.1"],
                 },
                 "apiServer": {
@@ -1157,6 +1169,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         )
         mock_appcred.assert_called_once_with(self.context, self.cluster_obj)
         mock_certs.assert_called_once_with(self.context, self.cluster_obj)
+        self.assertEqual([], mock_get_net.call_args_list)
 
     @mock.patch.object(driver.Driver, "_ensure_certificate_secrets")
     @mock.patch.object(driver.Driver, "_create_appcred_secret")
@@ -1176,10 +1189,12 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_load.return_value = mock_client
         self.cluster_obj.cluster_template.dns_nameserver = ""
         self.cluster_obj.keypair = "kp1"
+        self.cluster_obj.cluster_template.labels["extra_network_name"] = "foo"
 
         self.driver.create_cluster(self.context, self.cluster_obj, 10)
 
         app_cred_name = "cluster-example-a-111111111111-cloud-credentials"
+        ext_net_id = self.cluster_obj.cluster_template.external_network_id
         mock_install.assert_called_once_with(
             "cluster-example-a-111111111111",
             "openstack-cluster",
@@ -1188,7 +1203,13 @@ class ClusterAPIDriverTest(base.DbTestCase):
                 "machineImageId": "imageid1",
                 "cloudCredentialsSecretName": app_cred_name,
                 "clusterNetworking": {
-                    "internalNetwork": {"nodeCidr": "10.0.0.0/24"},
+                    "externalNetworkId": ext_net_id,
+                    "internalNetwork": {
+                        "networkFilter": None,
+                        "subnetFilter": None,
+                        "nodeCidr": "10.0.0.0/24",
+                    },
+                    "dnsNameservers": None,
                 },
                 "apiServer": {
                     "enableLoadBalancer": True,
@@ -1210,6 +1231,17 @@ class ClusterAPIDriverTest(base.DbTestCase):
                         "machineCount": 3,
                     }
                 ],
+                "nodeGroupDefaults": {
+                    "machineNetworking": {
+                        "ports": [
+                            {},
+                            {
+                                "network": {"name": "foo"},
+                                "securityGroups": [],
+                            },
+                        ],
+                    },
+                },
                 "machineSSHKeyName": "kp1",
             },
             repo=CONF.capi_helm.helm_chart_repo,
@@ -1243,6 +1275,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         self.driver.create_cluster(self.context, self.cluster_obj, 10)
 
         app_cred_name = "cluster-example-a-111111111111-cloud-credentials"
+        ext_net_id = self.cluster_obj.cluster_template.external_network_id
         mock_install.assert_called_once_with(
             "cluster-example-a-111111111111",
             "openstack-cluster",
@@ -1251,7 +1284,12 @@ class ClusterAPIDriverTest(base.DbTestCase):
                 "machineImageId": "imageid1",
                 "cloudCredentialsSecretName": app_cred_name,
                 "clusterNetworking": {
-                    "internalNetwork": {"nodeCidr": "10.0.0.0/24"},
+                    "externalNetworkId": ext_net_id,
+                    "internalNetwork": {
+                        "networkFilter": None,
+                        "subnetFilter": None,
+                        "nodeCidr": "10.0.0.0/24",
+                    },
                     "dnsNameservers": ["8.8.1.1"],
                 },
                 "apiServer": {
@@ -1274,6 +1312,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
                         "machineCount": 3,
                     }
                 ],
+                "machineSSHKeyName": None,
             },
             repo=CONF.capi_helm.helm_chart_repo,
             version=CONF.capi_helm.default_helm_chart_version,
