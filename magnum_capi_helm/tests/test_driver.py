@@ -1387,6 +1387,10 @@ class ClusterAPIDriverTest(base.DbTestCase):
                 ),
             ]
         )
+        mock_string_data.assert_called_once_with(
+            self.context, self.cluster_obj
+        )
+        mock_labels.assert_called_with(self.cluster_obj)
 
     @mock.patch.object(helm.Client, "uninstall_release")
     def test_delete_cluster(self, mock_uninstall):
