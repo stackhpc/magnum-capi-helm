@@ -448,7 +448,9 @@ class Driver(driver.Driver):
         for (
             name,
             data,
-        ) in ca_certificates.get_certificate_string_data().items():
+        ) in ca_certificates.get_certificate_string_data(
+            context, cluster
+        ).items():
             self._k8s_client.apply_secret(
                 self._sanitized_name(
                     self._get_chart_release_name(cluster), name
