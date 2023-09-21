@@ -87,6 +87,8 @@ FIXED_RANGE=10.1.0.0/24
 
 # Enable octavia tempest plugin tests
 enable_plugin octavia-tempest-plugin https://opendev.org/openstack/octavia-tempest-plugin
+
+# Horizon config
 disable_service horizon
 
 # Cinder (OpenStack Block Storage) is disabled by default to speed up
@@ -154,7 +156,6 @@ enable_plugin ovn-octavia-provider https://opendev.org/openstack/ovn-octavia-pro
 
 # Magnum
 enable_plugin magnum https://opendev.org/openstack/magnum
-enable_plugin magnum-ui https://opendev.org/openstack/magnum-ui
 
 [[post-config|$NOVA_CONF]]
 [scheduler]
@@ -165,7 +166,7 @@ EOF
 sudo chmod go+rw `tty`
 
 # Stack that stack!
-/opt/stack/stack.sh
+#/opt/stack/stack.sh
 
 # # Install `kubectl` CLI
 curl -fsLo /tmp/kubectl "https://dl.k8s.io/release/$(curl -fsL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
@@ -201,14 +202,18 @@ helm upgrade cert-manager cert-manager \
 		exit
 	}
 
+# Install clusterctl 
+curl -L https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.5.1/clusterctl-linux-amd64 -o clusterctl
+sudo install -o root -g root -m 0755 clusterctl /usr/local/bin/clusterctl
+
 # Install Cluster API resources
 # using the matching tested values here:
 # https://github.com/stackhpc/capi-helm-charts/blob/main/dependencies.json
 clusterctl init \
-    --core cluster-api:v1.5.2 \
-    --bootstrap kubeadm:v1.5.2 \
-    --control-plane kubeadm:v1.5.2 \
-    --infrastructure openstack:v0.7.3
+    --core cluster-api:v1.5.1 \
+    --bootstrap kubeadm:v1.5.1 \
+    --control-plane kubeadm:v1.5.1 \
+    --infrastructure openstack:v0.8.0
 
 # Install addon manager
 helm upgrade cluster-api-addon-provider cluster-api-addon-provider \
@@ -223,28 +228,28 @@ helm upgrade cluster-api-addon-provider cluster-api-addon-provider \
 # Create a Flavor
 source /opt/stack/openrc admin admin
 
-openstack flavor create ds2G20 --ram 2048 --disk 20 --id d5 --vcpus 2 --public
-
-pip install python-magnumclient
-
-# Add a k8s image
-curl -O https://object.arcus.openstack.hpc.cam.ac.uk/swift/v1/AUTH_f0dc9cb312144d0aa44037c9149d2513/azimuth-images-prerelease/ubuntu-focal-kube-v1.26.3-230411-1504.qcow2
-openstack image create ubuntu-focal-kube-v1.26.3 \
-  --file ubuntu-focal-kube-v1.26.3-230411-1504.qcow2 \
-  --disk-format qcow2 \
-  --container-format bare \
-  --public
-openstack image set ubuntu-focal-kube-v1.26.3 --os-distro ubuntu --os-version 20.04
-openstack image set ubuntu-focal-kube-v1.26.3 --property kube_version=v1.26.3
-
-curl -O https://object.arcus.openstack.hpc.cam.ac.uk/swift/v1/AUTH_f0dc9cb312144d0aa44037c9149d2513/azimuth-images-prerelease/ubuntu-focal-kube-v1.27.0-230418-0937.qcow2
-openstack image create ubuntu-focal-kube-v1.27.0 \
-  --file ubuntu-focal-kube-v1.27.0-230418-0937.qcow2 \
-  --disk-format qcow2 \
-  --container-format bare \
-  --public
-openstack image set ubuntu-focal-kube-v1.27.0 --os-distro ubuntu --os-version 20.04
-openstack image set ubuntu-focal-kube-v1.27.0 --property kube_version=v1.27.0
+#openstack flavor create ds2G20 --ram 2048 --disk 20 --id d5 --vcpus 2 --public
+#
+#pip install python-magnumclient
+#
+## Add a k8s image
+#curl -O https://object.arcus.openstack.hpc.cam.ac.uk/swift/v1/AUTH_f0dc9cb312144d0aa44037c9149d2513/azimuth-images-prerelease/ubuntu-focal-kube-v1.26.3-230411-1504.qcow2
+#openstack image create ubuntu-focal-kube-v1.26.3 \
+#  --file ubuntu-focal-kube-v1.26.3-230411-1504.qcow2 \
+#  --disk-format qcow2 \
+#  --container-format bare \
+#  --public
+#openstack image set ubuntu-focal-kube-v1.26.3 --os-distro ubuntu --os-version 20.04
+#openstack image set ubuntu-focal-kube-v1.26.3 --property kube_version=v1.26.3
+#
+#curl -O https://object.arcus.openstack.hpc.cam.ac.uk/swift/v1/AUTH_f0dc9cb312144d0aa44037c9149d2513/azimuth-images-prerelease/ubuntu-focal-kube-v1.27.0-230418-0937.qcow2
+#openstack image create ubuntu-focal-kube-v1.27.0 \
+#  --file ubuntu-focal-kube-v1.27.0-230418-0937.qcow2 \
+#  --disk-format qcow2 \
+#  --container-format bare \
+#  --public
+#openstack image set ubuntu-focal-kube-v1.27.0 --os-distro ubuntu --os-version 20.04
+#openstack image set ubuntu-focal-kube-v1.27.0 --property kube_version=v1.27.0
 
 #
 # Install this checkout and restart the Magnum services
@@ -253,6 +258,16 @@ SELF_PATH="$(realpath "${BASH_SOURCE[0]:-${(%):-%x}}")"
 REPO_PATH="$(dirname "$(dirname "$(dirname "$SELF_PATH")")")"
 python3 -m pip install -e "$REPO_PATH"
 sudo systemctl restart devstack@magnum-api devstack@magnum-cond
+
+new_path="/home/ubuntu/.local/bin"
+
+source ~/.bashrc
+
+# Check if the path is already in the PATH variable
+if [[ ":$PATH:" != *":$new_path:"* ]]; then
+  # If it's not in the PATH, add it
+  echo 'export PATH="$PATH:'"$new_path"'"' >> ~/.bashrc
+fi
 
 # Register template for cluster api driver
 openstack coe cluster template create new_driver \
