@@ -239,8 +239,8 @@ source /opt/stack/openrc admin admin
 #  --disk-format qcow2 \
 #  --container-format bare \
 #  --public
-#openstack image set ubuntu-focal-kube-v1.26.3 --os-distro ubuntu --os-version 20.04
-#openstack image set ubuntu-focal-kube-v1.26.3 --property kube_version=v1.26.3
+openstack image set ubuntu-focal-kube-v1.26.3 --os-distro capi-kubeadm-cloudinit --os-version 20.04
+openstack image set ubuntu-focal-kube-v1.26.3 --property kube_version=v1.26.3
 #
 #curl -O https://object.arcus.openstack.hpc.cam.ac.uk/swift/v1/AUTH_f0dc9cb312144d0aa44037c9149d2513/azimuth-images-prerelease/ubuntu-focal-kube-v1.27.0-230418-0937.qcow2
 #openstack image create ubuntu-focal-kube-v1.27.0 \
@@ -248,8 +248,8 @@ source /opt/stack/openrc admin admin
 #  --disk-format qcow2 \
 #  --container-format bare \
 #  --public
-#openstack image set ubuntu-focal-kube-v1.27.0 --os-distro ubuntu --os-version 20.04
-#openstack image set ubuntu-focal-kube-v1.27.0 --property kube_version=v1.27.0
+openstack image set ubuntu-focal-kube-v1.27.0 --os-distro capi-kubeadm-cloudinit --os-version 20.04
+openstack image set ubuntu-focal-kube-v1.27.0 --property kube_version=v1.27.0
 
 #
 # Install this checkout and restart the Magnum services
