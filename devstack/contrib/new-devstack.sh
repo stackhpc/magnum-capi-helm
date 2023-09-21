@@ -213,7 +213,7 @@ clusterctl init \
     --core cluster-api:v1.5.1 \
     --bootstrap kubeadm:v1.5.1 \
     --control-plane kubeadm:v1.5.1 \
-    --infrastructure openstack:v0.8.0
+    --infrastructure openstack:v0.7.3
 
 # Install addon manager
 helm upgrade cluster-api-addon-provider cluster-api-addon-provider \
