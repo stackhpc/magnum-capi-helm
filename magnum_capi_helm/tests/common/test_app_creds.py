@@ -82,7 +82,7 @@ class TestAppCreds(base.DbTestCase):
             user="fake_user",
             name=f"magnum-{self.cluster_obj.uuid}",
             description=f"Magnum cluster ({self.cluster_obj.uuid})",
-            roles=["member", "foo"],
+            # roles=["member", "foo"],
         )
 
     @mock.patch.object(app_creds, "_get_openstack_ca_certificate")
