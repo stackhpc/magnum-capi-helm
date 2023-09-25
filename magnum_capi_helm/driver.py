@@ -417,10 +417,12 @@ class Driver(driver.Driver):
 
     def _k8s_resource_labels(self, cluster):
         # TODO(johngarbutt) need to check these are safe labels
+        name = self._get_chart_release_name(cluster)
         return {
             "magnum.openstack.org/project-id": cluster.project_id[:63],
             "magnum.openstack.org/user-id": cluster.user_id[:63],
             "magnum.openstack.org/cluster-uuid": cluster.uuid[:63],
+            "cluster.x-k8s.io/cluster-name": name,
         }
 
     def _create_appcred_secret(self, context, cluster):
