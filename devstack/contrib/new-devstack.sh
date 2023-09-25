@@ -148,8 +148,8 @@ enable_service octavia
 enable_service o-api
 enable_service o-hk
 enable_service o-da
-disable_service o-cw
-disable_service o-hm
+enable_service o-cw
+enable_service o-hm
 
 # OVN octavia provider plugin
 enable_plugin ovn-octavia-provider https://opendev.org/openstack/ovn-octavia-provider
@@ -166,7 +166,7 @@ EOF
 sudo chmod go+rw `tty`
 
 # Stack that stack!
-#/opt/stack/stack.sh
+/opt/stack/stack.sh
 
 # # Install `kubectl` CLI
 curl -fsLo /tmp/kubectl "https://dl.k8s.io/release/$(curl -fsL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
@@ -228,26 +228,26 @@ helm upgrade cluster-api-addon-provider cluster-api-addon-provider \
 # Create a Flavor
 source /opt/stack/openrc admin admin
 
-#openstack flavor create ds2G20 --ram 2048 --disk 20 --id d5 --vcpus 2 --public
-#
-#pip install python-magnumclient
-#
-## Add a k8s image
-#curl -O https://object.arcus.openstack.hpc.cam.ac.uk/swift/v1/AUTH_f0dc9cb312144d0aa44037c9149d2513/azimuth-images-prerelease/ubuntu-focal-kube-v1.26.3-230411-1504.qcow2
-#openstack image create ubuntu-focal-kube-v1.26.3 \
-#  --file ubuntu-focal-kube-v1.26.3-230411-1504.qcow2 \
-#  --disk-format qcow2 \
-#  --container-format bare \
-#  --public
+openstack flavor create ds2G20 --ram 2048 --disk 20 --id d5 --vcpus 2 --public
+
+pip install python-magnumclient
+
+# Add a k8s image
+curl -O https://object.arcus.openstack.hpc.cam.ac.uk/swift/v1/AUTH_f0dc9cb312144d0aa44037c9149d2513/azimuth-images-prerelease/ubuntu-focal-kube-v1.26.3-230411-1504.qcow2
+openstack image create ubuntu-focal-kube-v1.26.3 \
+  --file ubuntu-focal-kube-v1.26.3-230411-1504.qcow2 \
+  --disk-format qcow2 \
+  --container-format bare \
+  --public
 openstack image set ubuntu-focal-kube-v1.26.3 --os-distro capi-kubeadm-cloudinit --os-version 20.04
 openstack image set ubuntu-focal-kube-v1.26.3 --property kube_version=v1.26.3
-#
-#curl -O https://object.arcus.openstack.hpc.cam.ac.uk/swift/v1/AUTH_f0dc9cb312144d0aa44037c9149d2513/azimuth-images-prerelease/ubuntu-focal-kube-v1.27.0-230418-0937.qcow2
-#openstack image create ubuntu-focal-kube-v1.27.0 \
-#  --file ubuntu-focal-kube-v1.27.0-230418-0937.qcow2 \
-#  --disk-format qcow2 \
-#  --container-format bare \
-#  --public
+
+curl -O https://object.arcus.openstack.hpc.cam.ac.uk/swift/v1/AUTH_f0dc9cb312144d0aa44037c9149d2513/azimuth-images-prerelease/ubuntu-focal-kube-v1.27.0-230418-0937.qcow2
+openstack image create ubuntu-focal-kube-v1.27.0 \
+  --file ubuntu-focal-kube-v1.27.0-230418-0937.qcow2 \
+  --disk-format qcow2 \
+  --container-format bare \
+  --public
 openstack image set ubuntu-focal-kube-v1.27.0 --os-distro capi-kubeadm-cloudinit --os-version 20.04
 openstack image set ubuntu-focal-kube-v1.27.0 --property kube_version=v1.27.0
 
