@@ -1334,6 +1334,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         self.driver._create_appcred_secret(self.context, self.cluster_obj)
 
         uuid = self.cluster_obj.uuid
+        name = "cluster-example-a-111111111111"
         mock_client.apply_secret.assert_called_once_with(
             "cluster-example-a-111111111111-cloud-credentials",
             {
@@ -1342,6 +1343,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
                         "magnum.openstack.org/project-id": "fake_project",
                         "magnum.openstack.org/user-id": "fake_user",
                         "magnum.openstack.org/cluster-uuid": uuid,
+                        "cluster.x-k8s.io/cluster-name": name,
                     }
                 },
                 "stringData": {"cacert": "ca", "clouds.yaml": "appcred"},
