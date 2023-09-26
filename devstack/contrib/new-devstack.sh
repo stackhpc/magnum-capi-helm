@@ -93,7 +93,7 @@ disable_service horizon
 
 # Cinder (OpenStack Block Storage) is disabled by default to speed up
 # DevStack a bit. You may enable it here if you would like to use it.
-disable_service cinder c-sch c-api c-vol
+enable_service cinder c-sch c-api c-vol
 
 # A UUID to uniquely identify this system.  If one is not specified, a random
 # one will be generated and saved in the file 'ovn-uuid' for re-use in future
@@ -132,7 +132,7 @@ disable_service cinder c-sch c-api c-vol
 #OVN_L3_CREATE_PUBLIC_NETWORK=True
 
 # This needs to be equalized with Neutron devstack
-#PUBLIC_NETWORK_GATEWAY="172.24.4.1"
+PUBLIC_NETWORK_GATEWAY="172.24.4.1"
 
 # Nova config
 LIBVIRT_TYPE=kvm
@@ -148,8 +148,8 @@ enable_service octavia
 enable_service o-api
 enable_service o-hk
 enable_service o-da
-disable_service o-cw
-disable_service o-hm
+enable_service o-cw
+enable_service o-hm
 
 # OVN octavia provider plugin
 enable_plugin ovn-octavia-provider https://opendev.org/openstack/ovn-octavia-provider
@@ -166,7 +166,7 @@ EOF
 sudo chmod go+rw `tty`
 
 # Stack that stack!
-#/opt/stack/stack.sh
+/opt/stack/stack.sh
 
 # # Install `kubectl` CLI
 curl -fsLo /tmp/kubectl "https://dl.k8s.io/release/$(curl -fsL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
@@ -228,28 +228,28 @@ helm upgrade cluster-api-addon-provider cluster-api-addon-provider \
 # Create a Flavor
 source /opt/stack/openrc admin admin
 
-#openstack flavor create ds2G20 --ram 2048 --disk 20 --id d5 --vcpus 2 --public
-#
-#pip install python-magnumclient
-#
-## Add a k8s image
-#curl -O https://object.arcus.openstack.hpc.cam.ac.uk/swift/v1/AUTH_f0dc9cb312144d0aa44037c9149d2513/azimuth-images-prerelease/ubuntu-focal-kube-v1.26.3-230411-1504.qcow2
-#openstack image create ubuntu-focal-kube-v1.26.3 \
-#  --file ubuntu-focal-kube-v1.26.3-230411-1504.qcow2 \
-#  --disk-format qcow2 \
-#  --container-format bare \
-#  --public
-openstack image set ubuntu-focal-kube-v1.26.3 --os-distro capi-kubeadm-cloudinit --os-version 20.04
-openstack image set ubuntu-focal-kube-v1.26.3 --property kube_version=v1.26.3
-#
-#curl -O https://object.arcus.openstack.hpc.cam.ac.uk/swift/v1/AUTH_f0dc9cb312144d0aa44037c9149d2513/azimuth-images-prerelease/ubuntu-focal-kube-v1.27.0-230418-0937.qcow2
-#openstack image create ubuntu-focal-kube-v1.27.0 \
-#  --file ubuntu-focal-kube-v1.27.0-230418-0937.qcow2 \
-#  --disk-format qcow2 \
-#  --container-format bare \
-#  --public
-openstack image set ubuntu-focal-kube-v1.27.0 --os-distro capi-kubeadm-cloudinit --os-version 20.04
-openstack image set ubuntu-focal-kube-v1.27.0 --property kube_version=v1.27.0
+openstack flavor create ds2G20 --ram 2048 --disk 20 --id d5 --vcpus 2 --public
+
+pip install python-magnumclient
+
+# Add a k8s image
+curl -fo ubuntu-focal-kube-v1.27.5-230831-1149.qcow2 'https://object.arcus.openstack.hpc.cam.ac.uk/azimuth-images/ubuntu-focal-kube-v1.27.5-230831-1149.qcow2?AWSAccessKeyId=c5bd0fa15bae4e08b305a52aac97c3a6&Expires=1725019728&Signature=1ZO1YVg70K1obu%2FGZHfylG3oX7U%3D'
+openstack image create ubuntu-focal-kube-v1.27.5 \
+  --file ubuntu-focal-kube-v1.27.5-230831-1149.qcow2 \
+  --disk-format qcow2 \
+  --container-format bare \
+  --public
+openstack image set ubuntu-focal-kube-v1.27.5 --os-distro capi-kubeadm-cloudinit --os-version 20.04
+openstack image set ubuntu-focal-kube-v1.27.5 --property kube_version=v1.27.5
+
+curl -fo ubuntu-focal-kube-v1.28.1-230831-1150.qcow2 'https://object.arcus.openstack.hpc.cam.ac.uk/azimuth-images/ubuntu-focal-kube-v1.28.1-230831-1150.qcow2?AWSAccessKeyId=c5bd0fa15bae4e08b305a52aac97c3a6&Expires=1725019898&Signature=%2FXW2ywkA%2FQ8bCUiJkiLCWBAf81M%3D'
+openstack image create ubuntu-focal-kube-v1.28.1 \
+  --file ubuntu-focal-kube-v1.28.1-230831-1150.qcow2  \
+  --disk-format qcow2 \
+  --container-format bare \
+  --public
+openstack image set ubuntu-focal-kube-v1.28.1 --os-distro capi-kubeadm-cloudinit --os-version 20.04
+openstack image set ubuntu-focal-kube-v1.28.1 --property kube_version=v1.28.1
 
 #
 # Install this checkout and restart the Magnum services
@@ -273,7 +273,7 @@ fi
 openstack coe cluster template create new_driver \
   --coe kubernetes \
   --label octavia_provider=ovn \
-  --image $(openstack image show ubuntu-focal-kube-v1.26.3 -c id -f value) \
+  --image $(openstack image show ubuntu-focal-kube-v1.27.5 -c id -f value) \
   --external-network public \
   --master-flavor ds2G20 \
   --flavor ds2G20 \
@@ -282,7 +282,8 @@ openstack coe cluster template create new_driver \
 
 openstack coe cluster template create new_driver_upgrade \
   --coe kubernetes \
-  --image $(openstack image show ubuntu-focal-kube-v1.27.0 -c id -f value) \
+  --label octavia_provider=ovn \
+  --image $(openstack image show ubuntu-focal-kube-v1.28.1 -c id -f value) \
   --external-network public \
   --master-flavor ds2G20 \
   --flavor ds2G20 \
