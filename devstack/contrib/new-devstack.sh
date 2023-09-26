@@ -132,7 +132,7 @@ disable_service cinder c-sch c-api c-vol
 #OVN_L3_CREATE_PUBLIC_NETWORK=True
 
 # This needs to be equalized with Neutron devstack
-#PUBLIC_NETWORK_GATEWAY="172.24.4.1"
+PUBLIC_NETWORK_GATEWAY="172.24.4.1"
 
 # Nova config
 LIBVIRT_TYPE=kvm
