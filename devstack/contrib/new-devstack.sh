@@ -209,11 +209,12 @@ sudo install -o root -g root -m 0755 clusterctl /usr/local/bin/clusterctl
 # Install Cluster API resources
 # using the matching tested values here:
 # https://github.com/stackhpc/capi-helm-charts/blob/main/dependencies.json
+export EXP_KUBEADM_BOOTSTRAP_FORMAT_IGNITION=true
 clusterctl init \
     --core cluster-api:v1.5.1 \
     --bootstrap kubeadm:v1.5.1 \
     --control-plane kubeadm:v1.5.1 \
-    --infrastructure openstack:v0.7.3
+    --infrastructure openstack:v0.8.0
 
 # Install addon manager
 helm upgrade cluster-api-addon-provider cluster-api-addon-provider \

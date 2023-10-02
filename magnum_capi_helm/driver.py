@@ -769,3 +769,108 @@ class Driver(driver.Driver):
 
     def delete_federation(self, context, federation):
         raise NotImplementedError("Will not implement 'delete_federation'")
+
+
+class IgnitionDriver(Driver):
+    @property
+    def provides(self):
+        return [
+            {
+                "server_type": "vm",
+                "os": "capi-kubeadm-ignition",
+                "coe": "kubernetes",
+            },
+        ]
+
+    def _update_helm_release(self, context, cluster, nodegroups=None):
+        # TODO(stefan-chivu) reorganize class structure to keep the code dry
+        if nodegroups is None:
+            nodegroups = cluster.nodegroups
+
+        image_id, kube_version = self._get_image_details(
+            context, cluster.cluster_template.image_id
+        )
+
+        network_id = self._get_fixed_network_id(context, cluster)
+        subnet_id = neutron.get_fixed_subnet_id(context, cluster.fixed_subnet)
+
+        values = {
+            "kubernetesVersion": kube_version,
+            "machineImageId": image_id,
+            "machineSSHKeyName": cluster.keypair or None,
+            "bootstrappingFormat": "ignition",
+            "cloudCredentialsSecretName": self._get_app_cred_name(cluster),
+            "apiServer": {
+                "enableLoadBalancer": True,
+                "loadBalancerProvider": self._label(
+                    cluster, "octavia_provider", "amphora"
+                ),
+            },
+            "clusterNetworking": {
+                "dnsNameservers": self._get_dns_nameservers(cluster),
+                "externalNetworkId": neutron.get_external_network_id(
+                    context, cluster.cluster_template.external_network_id
+                ),
+                "internalNetwork": {
+                    "networkFilter": (
+                        {"id": network_id} if network_id else None
+                    ),
+                    "subnetFilter": ({"id": subnet_id} if subnet_id else None),
+                    # This is only used if a fixed network is not specified
+                    "nodeCidr": self._label(
+                        cluster, "fixed_subnet_cidr", "10.0.0.0/24"
+                    ),
+                },
+            },
+            "controlPlane": {
+                "machineFlavor": cluster.master_flavor_id,
+                "machineCount": cluster.master_count,
+            },
+            "nodeGroups": [
+                {
+                    "name": self._sanitized_name(ng.name),
+                    "machineFlavor": ng.flavor_id,
+                    "machineCount": ng.node_count,
+                }
+                for ng in nodegroups
+                if ng.role != NODE_GROUP_ROLE_CONTROLLER
+            ],
+            "addons": {
+                "monitoring": {
+                    "enabled": self._get_monitoring_enabled(cluster)
+                },
+                "kubernetesDashboard": {
+                    "enabled": self._get_kube_dash_enabled(cluster)
+                },
+                # TODO(mkjpryor): can't enable ingress until code exists to
+                #                 remove the load balancer
+                "ingress": {"enabled": False},
+            },
+        }
+
+        # Sometimes you need to add an extra network
+        # for things like Cinder CSI CephFS Native
+        extra_network_name = self._label(cluster, "extra_network_name", "")
+        if extra_network_name:
+            values["nodeGroupDefaults"] = {
+                "machineNetworking": {
+                    "ports": [
+                        {},
+                        {
+                            "network": {
+                                "name": extra_network_name,
+                            },
+                            "securityGroups": [],
+                        },
+                    ]
+                }
+            }
+
+        self._helm_client.install_or_upgrade(
+            self._get_chart_release_name(cluster),
+            CONF.capi_helm.helm_chart_name,
+            values,
+            repo=CONF.capi_helm.helm_chart_repo,
+            version=self._get_chart_version(cluster),
+            namespace=self._namespace(cluster),
+        )
