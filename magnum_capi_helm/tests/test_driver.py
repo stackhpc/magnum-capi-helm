@@ -53,7 +53,12 @@ class ClusterAPIDriverTest(base.DbTestCase):
                     "server_type": "vm",
                     "os": "ubuntu",
                     "coe": "kubernetes",
-                }
+                },
+                {
+                    "server_type": "vm",
+                    "os": "flatcar",
+                    "coe": "kubernetes",
+                },
             ],
             self.driver.provides,
         )
@@ -1017,24 +1022,61 @@ class ClusterAPIDriverTest(base.DbTestCase):
         self.assertEqual("1.27.9", result)
         mock_image.get.assert_called_once_with("kube_version")
 
-    @mock.patch("magnum.common.clients.OpenStackClients")
-    @mock.patch("magnum.api.utils.get_openstack_resource")
-    def test_get_image_details(self, mock_get, mock_osc):
+    @mock.patch("magnum.common.clients.OpenStackClients", autospec=True)
+    @mock.patch("magnum.api.utils.get_openstack_resource", autospec=True)
+    def test_get_image_details_ubuntu(self, mock_get, mock_osc):
         mock_image = mock.Mock()
-        mock_image.get.return_value = "v1.27.9"
+        image_metadata = {
+            "os_distro": "ubuntu",
+            "kube_version": "1.27.9",
+        }
+
+        def image_side_effect(arg):
+            return image_metadata[arg]
+
+        mock_image.get.side_effect = image_side_effect
         mock_image.id = "myid"
         mock_get.return_value = mock_image
 
-        id, version = self.driver._get_image_details(
+        id, version, distro = self.driver._get_image_details(
             self.context, "myimagename"
         )
 
         self.assertEqual("1.27.9", version)
         self.assertEqual("myid", id)
-        mock_image.get.assert_called_once_with("kube_version")
+        self.assertEqual("ubuntu", distro)
+        mock_image.get.assert_any_call("kube_version")
+        mock_image.get.assert_any_call("os_distro")
         mock_get.assert_called_once_with(mock.ANY, "myimagename", "images")
 
-    def test_get_chart_release_name_lenght(self):
+    @mock.patch("magnum.common.clients.OpenStackClients", autospec=True)
+    @mock.patch("magnum.api.utils.get_openstack_resource", autospec=True)
+    def test_get_image_details_flatcar(self, mock_get, mock_osc):
+        mock_image = mock.Mock()
+        image_metadata = {
+            "os_distro": "flatcar",
+            "kube_version": "1.28.2",
+        }
+
+        def image_side_effect(arg):
+            return image_metadata[arg]
+
+        mock_image.get.side_effect = image_side_effect
+        mock_image.id = "myid-flatcar"
+        mock_get.return_value = mock_image
+
+        id, version, distro = self.driver._get_image_details(
+            self.context, "myimagename"
+        )
+
+        self.assertEqual("1.28.2", version)
+        self.assertEqual("myid-flatcar", id)
+        self.assertEqual("flatcar", distro)
+        mock_image.get.assert_any_call("kube_version")
+        mock_image.get.assert_any_call("os_distro")
+        mock_get.assert_called_once_with(mock.ANY, "myimagename", "images")
+
+    def test_get_chart_release_name_length(self):
         self.cluster_obj.stack_id = "foo"
 
         result = self.driver._get_chart_release_name(self.cluster_obj)
@@ -1137,6 +1179,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
                     "machineCount": 3,
                 },
             ],
+            "osDistro": "ubuntu",
             "machineSSHKeyName": None,
         }
 
@@ -1155,7 +1198,11 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_certs,
         mock_get_net,
     ):
-        mock_image.return_value = ("imageid1", "1.27.4")
+        mock_image.return_value = (
+            "imageid1",
+            "1.27.4",
+            "ubuntu",
+        )
         mock_client = mock.MagicMock(spec=kubernetes.Client)
         mock_load.return_value = mock_client
         mock_get_net.side_effect = (
@@ -1194,7 +1241,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_appcred,
         mock_certs,
     ):
-        mock_image.return_value = ("imageid1", "1.27.4")
+        mock_image.return_value = ("imageid1", "1.27.4", "ubuntu")
         mock_client = mock.MagicMock(spec=kubernetes.Client)
         mock_load.return_value = mock_client
 
@@ -1204,6 +1251,9 @@ class ClusterAPIDriverTest(base.DbTestCase):
 
         expected_values = self.get_cluster_helm_standard_values()
         expected_values["clusterNetworking"]["dnsNameservers"] = None
+
+        helm_install_values = mock_install.call_args[0][2]
+        self.assertDictEqual(helm_install_values, expected_values)
 
         mock_install.assert_called_once_with(
             "cluster-example-a-111111111111",
@@ -1234,7 +1284,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_appcred,
         mock_certs,
     ):
-        mock_image.return_value = ("imageid1", "1.27.4")
+        mock_image.return_value = ("imageid1", "1.27.4", "ubuntu")
         mock_client = mock.MagicMock(spec=kubernetes.Client)
         mock_load.return_value = mock_client
 
@@ -1266,6 +1316,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
                     "enableLoadBalancer": True,
                     "loadBalancerProvider": "amphora",
                 },
+                "osDistro": "ubuntu",
                 "controlPlane": {
                     "machineFlavor": "flavor_small",
                     "machineCount": 3,
@@ -1323,7 +1374,11 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_appcred,
         mock_certs,
     ):
-        mock_image.return_value = ("imageid1", "1.27.4")
+        mock_image.return_value = (
+            "imageid1",
+            "1.27.4",
+            "ubuntu",
+        )
         mock_client = mock.MagicMock(spec=kubernetes.Client)
         mock_load.return_value = mock_client
 
@@ -1357,6 +1412,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
                     "enableLoadBalancer": True,
                     "loadBalancerProvider": "amphora",
                 },
+                "osDistro": "ubuntu",
                 "controlPlane": {
                     "machineFlavor": "flavor_small",
                     "machineCount": 3,
@@ -1423,7 +1479,11 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_appcred,
         mock_certs,
     ):
-        mock_image.return_value = ("imageid1", "1.27.4")
+        mock_image.return_value = (
+            "imageid1",
+            "1.27.4",
+            "ubuntu",
+        )
         mock_client = mock.MagicMock(spec=kubernetes.Client)
         mock_load.return_value = mock_client
 
@@ -1433,6 +1493,46 @@ class ClusterAPIDriverTest(base.DbTestCase):
 
         expected_values = self.get_cluster_helm_standard_values()
         expected_values["machineSSHKeyName"] = "kp1"
+
+        mock_install.assert_called_once_with(
+            "cluster-example-a-111111111111",
+            "openstack-cluster",
+            expected_values,
+            repo=CONF.capi_helm.helm_chart_repo,
+            version=CONF.capi_helm.default_helm_chart_version,
+            namespace="magnum-fakeproject",
+        )
+        mock_client.ensure_namespace.assert_called_once_with(
+            "magnum-fakeproject"
+        )
+        mock_appcred.assert_called_once_with(self.context, self.cluster_obj)
+        mock_certs.assert_called_once_with(self.context, self.cluster_obj)
+
+    @mock.patch.object(driver.Driver, "_ensure_certificate_secrets")
+    @mock.patch.object(driver.Driver, "_create_appcred_secret")
+    @mock.patch.object(kubernetes.Client, "load")
+    @mock.patch.object(driver.Driver, "_get_image_details")
+    @mock.patch.object(helm.Client, "install_or_upgrade")
+    def test_create_cluster_flatcar(
+        self,
+        mock_install,
+        mock_image,
+        mock_load,
+        mock_appcred,
+        mock_certs,
+    ):
+        mock_image.return_value = (
+            "imageid1",
+            "1.27.4",
+            "flatcar",
+        )
+        mock_client = mock.MagicMock(spec=kubernetes.Client)
+        mock_load.return_value = mock_client
+
+        self.driver.create_cluster(self.context, self.cluster_obj, 10)
+
+        expected_values = self.get_cluster_helm_standard_values()
+        expected_values["osDistro"] = "flatcar"
 
         mock_install.assert_called_once_with(
             "cluster-example-a-111111111111",
