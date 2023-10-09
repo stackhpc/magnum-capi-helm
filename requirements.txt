@@ -3,6 +3,6 @@
 # process, which may cause wedges in the gate later.
 
 pbr>=2.0 # Apache-2.0
-magnum
 oslo_log
 oslo_utils
+magnum<17.0.0 # test against 2023.1 for now
