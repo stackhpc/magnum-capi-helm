@@ -100,6 +100,9 @@ The driver supports the following labels:
 * extra_network_name: default is "", change to name of additional network,
   which can be useful if using Manila with the CephFS Native driver.
 
+Currently all clusters use the Calico CNI. While Cilium is also supported
+in the helm charts, it is not currently reguarlly tested.
+
 We have found upgrade with ClusterAPI doesn't work well without
 using a loadbalancer, even with a single node control plane,
 so we currently ignore the "master-lb-enabled" flag.
