@@ -412,8 +412,8 @@ class Driver(driver.Driver):
         # We create clusters in a project-specific namespace
         # To generate the namespace, first sanitize the project id
         project_id = re.sub("[^a-z0-9]", "", cluster.project_id.lower())
-        suffix = CONF.capi_helm.namespace_suffix
-        return f"{suffix}-{project_id}"
+        prefix = CONF.capi_helm.namespace_prefix
+        return f"{prefix}-{project_id}"
 
     def _k8s_resource_labels(self, cluster):
         # TODO(johngarbutt) need to check these are safe labels
