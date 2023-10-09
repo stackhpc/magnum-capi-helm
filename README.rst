@@ -79,6 +79,33 @@ property set when uploaded to Glance. For example:::
     openstack image set ubuntu-focal-kube-v1.28.1 \
         --os-distro capi-kubeadm-cloudinit
 
+Finally, this means you can now create a template, and then a cluster,
+get the kubeconfig to access it, then run sonaboy to test it,
+doing something like this:::
+
+  openstack coe cluster template create new_driver \
+    --coe kubernetes \
+    --label octavia_provider=ovn \
+    --image $(openstack image show ubuntu-focal-kube-v1.28.1 -c id -f value) \
+    --external-network public \
+    --master-flavor ds2G20 \
+    --flavor ds2G20 \
+    --public \
+    --master-lb-enabled
+
+  openstack coe cluster create devstacktest \
+    --cluster-template new_driver \
+    --master-count 1 \
+    --node-count 2
+  openstack coe cluster list
+
+  mkdir -p ~/clusters/devstacktest
+  cd ~/clusters/devstacktest
+  openstack coe cluster config devstacktest
+  export KUBECONFIG=~/clusters/kubernetes-cluster/config
+  kubectl get nodes
+  sonobuoy run --mode quick --wait
+
 DevStack Setup
 ==============
 
@@ -111,7 +138,7 @@ The driver supports the following labels:
 
 * monitoring_enabled: default is off, change to "true" to enable
 * kube_dashboard_enabled: defalt is on, change to "false" to disable
-* octavia_provider: default is "amphora"
+* octavia_provider: default is "amphora", ovn is also an option
 * fixed_subnet_cidr: default is "10.0.0.0/24"
 * extra_network_name: default is "", change to name of additional network,
   which can be useful if using Manila with the CephFS Native driver.
