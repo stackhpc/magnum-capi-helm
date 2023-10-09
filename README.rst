@@ -34,6 +34,8 @@ it should be picked up by Magnum:::
   cd magnum-capi-helm
   pip install -e .
 
+We currently run the unit tests against the 2023.1 version of Magnum.
+
 The driver requires access to a Cluster API management cluster.
 For more information, please see:
 https://cluster-api.sigs.k8s.io/user/quick-start
