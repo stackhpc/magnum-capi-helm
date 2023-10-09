@@ -28,13 +28,13 @@ capi_helm_opts = [
         ),
     ),
     cfg.StrOpt(
-        "namespace_suffix",
+        "namespace_prefix",
         default="magnum",
         help=(
             "Resources for each openstack cluster are created in a "
             "separate namespace within the CAPI Management cluster "
-            "specified by the configuration: [capi_helm]kubeconfig_file "
-            "You should modify this suffix when two magnum deployments "
+            "specified by the configuration: [capi_helm]/kubeconfig_file "
+            "You should modify this prefix when two magnum deployments "
             "want to share a single CAPI management cluster."
         ),
     ),
