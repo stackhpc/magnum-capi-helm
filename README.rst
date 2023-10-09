@@ -27,6 +27,8 @@ https://specs.openstack.org/openstack/magnum-specs/specs/bobcat/clusterapi-drive
 Installation and Dependencies
 =============================
 
+For a kolla-ansible deployment, you can follow `this <https://stackhpc-kayobe-config.readthedocs.io/en/stackhpc-yoga/configuration/magnum-capi.html>`__ guide.
+
 If you install this python package within your Magnum virtual env,
 it should be picked up by Magnum:::
 
@@ -51,6 +53,9 @@ To create a cluster, first you will need an image that
 has been built to include kubernetes.
 There are community maintained packer build pipelines here:
 https://image-builder.sigs.k8s.io/capi/capi.html
+
+Or you can grab prebuilt images from our `azimuth image releases <https://github.com/stackhpc/azimuth-images/releases/latest>`__.
+Images are available in the `manifest.json` file, and are named in the format `ubuntu-<ubuntu release>-<kube version>-<date and time of build>`.
 
 The above image needs to have the correct os-distro
 property set when uploaded to Glance. For example:::
