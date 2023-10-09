@@ -83,9 +83,35 @@ The CAPI helm charts are currently being tested
 with K8s 1.26, 1.27 and 1.28:
 https://github.com/stackhpc/capi-helm-charts/blob/main/.github/workflows/ensure-capi-images.yaml#L9
 
-The currently supported labels include:
+The driver respects the following cluster and template properties:
 
-* TODO
+* image_id
+* keypair
+* fixed_network, fixed_subnet (if missing, new one is created)
+* external_network_id
+* dns_nameserver
+
+The driver supports the following labels:
+
+* monitoring_enabled: default is off, change to "true" to enable
+* kube_dashboard_enabled: defalt is on, change to "false" to disable
+* octavia_provider: default is "amphora"
+* fixed_subnet_cidr: default is "10.0.0.0/24"
+* extra_network_name: default is "", change to name of additional network,
+  which can be useful if using Manila with the CephFS Native driver.
+
+We have found upgrade with ClusterAPI doesn't work well without
+using a loadbalancer, even with a single node control plane,
+so we currently ignore the "master-lb-enabled" flag.
+
+NOTE:
+We are working in Cluster API provider OpenStack to add the ability
+to store the etcd state on a cinder volume, separate from the root
+disk. This is a big feature gap for clouds where most of your
+root disks are on spinning disk Ceph, which is not fast enough
+for etcd to operate correctly, but equally you don't have enough
+ssd based Ceph to put all controller root disks on that Ceph:
+https://github.com/kubernetes-sigs/cluster-api-provider-openstack/pull/1668
 
 History
 =======
