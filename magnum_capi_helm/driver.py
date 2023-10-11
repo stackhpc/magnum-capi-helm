@@ -608,19 +608,22 @@ class Driver(driver.Driver):
         # for things like Cinder CSI CephFS Native
         extra_network_name = self._label(cluster, "extra_network_name", "")
         if extra_network_name:
-            values["nodeGroupDefaults"] = {
-                "machineNetworking": {
-                    "ports": [
-                        {},
-                        {
-                            "network": {
-                                "name": extra_network_name,
+            network_details = {
+                "nodeGroupDefaults": {
+                    "machineNetworking": {
+                        "ports": [
+                            {},
+                            {
+                                "network": {
+                                    "name": extra_network_name,
+                                },
+                                "securityGroups": [],
                             },
-                            "securityGroups": [],
-                        },
-                    ]
-                }
+                        ],
+                    },
+                },
             }
+            values = helm.mergeconcat(values, network_details)
 
         self._helm_client.install_or_upgrade(
             self._get_chart_release_name(cluster),
