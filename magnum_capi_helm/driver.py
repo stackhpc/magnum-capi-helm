@@ -604,6 +604,25 @@ class Driver(driver.Driver):
             },
         }
 
+        # Add boot disk details, if defined in config file.
+        # Helm chart defaults to ephemeral disks, if unset.
+        if CONF.cinder.default_boot_volume_type:
+            disk_details = {
+                "controlPlane": {
+                    "machineRootVolume": {
+                        "volumeType": CONF.cinder.default_boot_volume_type,
+                        "diskSize": CONF.cinder.default_boot_volume_size or "",
+                    }
+                },
+                "nodeGroupDefaults": {
+                    "machineRootVolume": {
+                        "volumeType": CONF.cinder.default_boot_volume_type,
+                        "diskSize": CONF.cinder.default_boot_volume_size or "",
+                    }
+                },
+            }
+            values = helm.mergeconcat(values, disk_details)
+
         # Sometimes you need to add an extra network
         # for things like Cinder CSI CephFS Native
         extra_network_name = self._label(cluster, "extra_network_name", "")

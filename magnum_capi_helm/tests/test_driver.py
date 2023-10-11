@@ -1254,6 +1254,197 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_appcred.assert_called_once_with(self.context, self.cluster_obj)
         mock_certs.assert_called_once_with(self.context, self.cluster_obj)
 
+    @mock.patch.object(
+        driver.Driver, "_ensure_certificate_secrets", autospec=True
+    )
+    @mock.patch.object(driver.Driver, "_create_appcred_secret", autospec=True)
+    @mock.patch.object(kubernetes.Client, "load", autospec=True)
+    @mock.patch.object(driver.Driver, "_get_image_details", autospec=True)
+    @mock.patch.object(helm.Client, "install_or_upgrade", autospec=True)
+    def test_create_cluster_boot_volume(
+        self,
+        mock_install,
+        mock_image,
+        mock_load,
+        mock_appcred,
+        mock_certs,
+    ):
+        mock_image.return_value = ("imageid1", "1.27.4")
+        mock_client = mock.MagicMock(spec=kubernetes.Client)
+        mock_load.return_value = mock_client
+
+        CONF.cinder.default_boot_volume_type = "nvme"
+        CONF.cinder.default_boot_volume_size = 12
+
+        self.driver.create_cluster(self.context, self.cluster_obj, 10)
+
+        app_cred_name = "cluster-example-a-111111111111-cloud-credentials"
+        ext_net_id = self.cluster_obj.cluster_template.external_network_id
+        mock_install.assert_called_once_with(
+            self.driver._helm_client,
+            "cluster-example-a-111111111111",
+            "openstack-cluster",
+            {
+                "kubernetesVersion": "1.27.4",
+                "machineImageId": "imageid1",
+                "cloudCredentialsSecretName": app_cred_name,
+                "clusterNetworking": {
+                    "externalNetworkId": ext_net_id,
+                    "internalNetwork": {
+                        "networkFilter": None,
+                        "subnetFilter": None,
+                        "nodeCidr": "10.0.0.0/24",
+                    },
+                    "dnsNameservers": ["8.8.1.1"],
+                },
+                "apiServer": {
+                    "enableLoadBalancer": True,
+                    "loadBalancerProvider": "amphora",
+                },
+                "controlPlane": {
+                    "machineFlavor": "flavor_small",
+                    "machineCount": 3,
+                    "machineRootVolume": {
+                        "volumeType": "nvme",
+                        "diskSize": 12,
+                    },
+                },
+                "addons": {
+                    "monitoring": {"enabled": False},
+                    "kubernetesDashboard": {"enabled": True},
+                    "ingress": {"enabled": False},
+                },
+                "nodeGroups": [
+                    {
+                        "name": "test-worker",
+                        "machineFlavor": "flavor_medium",
+                        "machineCount": 3,
+                    },
+                ],
+                "nodeGroupDefaults": {
+                    "machineRootVolume": {
+                        "volumeType": "nvme",
+                        "diskSize": 12,
+                    },
+                },
+                "machineSSHKeyName": None,
+            },
+            repo=CONF.capi_helm.helm_chart_repo,
+            version=CONF.capi_helm.default_helm_chart_version,
+            namespace="magnum-fakeproject",
+        )
+        mock_client.ensure_namespace.assert_called_once_with(
+            "magnum-fakeproject"
+        )
+        mock_appcred.assert_called_once_with(
+            self.driver, self.context, self.cluster_obj
+        )
+        mock_certs.assert_called_once_with(
+            self.driver, self.context, self.cluster_obj
+        )
+
+    @mock.patch.object(
+        driver.Driver, "_ensure_certificate_secrets", autospec=True
+    )
+    @mock.patch.object(driver.Driver, "_create_appcred_secret", autospec=True)
+    @mock.patch.object(kubernetes.Client, "load", autospec=True)
+    @mock.patch.object(driver.Driver, "_get_image_details", autospec=True)
+    @mock.patch.object(helm.Client, "install_or_upgrade", autospec=True)
+    def test_create_cluster_boot_volume_extra_network(
+        self,
+        mock_install,
+        mock_image,
+        mock_load,
+        mock_appcred,
+        mock_certs,
+    ):
+        mock_image.return_value = ("imageid1", "1.27.4")
+        mock_client = mock.MagicMock(spec=kubernetes.Client)
+        mock_load.return_value = mock_client
+
+        CONF.cinder.default_boot_volume_type = "nvme"
+        CONF.cinder.default_boot_volume_size = 12
+        # Driver should combine boot volume with extra network.
+        self.cluster_obj.cluster_template.labels["extra_network_name"] = "foo"
+
+        self.driver.create_cluster(self.context, self.cluster_obj, 10)
+
+        app_cred_name = "cluster-example-a-111111111111-cloud-credentials"
+        ext_net_id = self.cluster_obj.cluster_template.external_network_id
+        mock_install.assert_called_once_with(
+            self.driver._helm_client,
+            "cluster-example-a-111111111111",
+            "openstack-cluster",
+            {
+                "kubernetesVersion": "1.27.4",
+                "machineImageId": "imageid1",
+                "cloudCredentialsSecretName": app_cred_name,
+                "clusterNetworking": {
+                    "externalNetworkId": ext_net_id,
+                    "internalNetwork": {
+                        "networkFilter": None,
+                        "subnetFilter": None,
+                        "nodeCidr": "10.0.0.0/24",
+                    },
+                    "dnsNameservers": ["8.8.1.1"],
+                },
+                "apiServer": {
+                    "enableLoadBalancer": True,
+                    "loadBalancerProvider": "amphora",
+                },
+                "controlPlane": {
+                    "machineFlavor": "flavor_small",
+                    "machineCount": 3,
+                    "machineRootVolume": {
+                        "volumeType": "nvme",
+                        "diskSize": 12,
+                    },
+                },
+                "addons": {
+                    "monitoring": {"enabled": False},
+                    "kubernetesDashboard": {"enabled": True},
+                    "ingress": {"enabled": False},
+                },
+                "nodeGroups": [
+                    {
+                        "name": "test-worker",
+                        "machineFlavor": "flavor_medium",
+                        "machineCount": 3,
+                    },
+                ],
+                "nodeGroupDefaults": {
+                    "machineNetworking": {
+                        "ports": [
+                            {},
+                            {
+                                "network": {
+                                    "name": "foo",
+                                },
+                                "securityGroups": [],
+                            },
+                        ],
+                    },
+                    "machineRootVolume": {
+                        "volumeType": "nvme",
+                        "diskSize": 12,
+                    },
+                },
+                "machineSSHKeyName": None,
+            },
+            repo=CONF.capi_helm.helm_chart_repo,
+            version=CONF.capi_helm.default_helm_chart_version,
+            namespace="magnum-fakeproject",
+        )
+        mock_client.ensure_namespace.assert_called_once_with(
+            "magnum-fakeproject"
+        )
+        mock_appcred.assert_called_once_with(
+            self.driver, self.context, self.cluster_obj
+        )
+        mock_certs.assert_called_once_with(
+            self.driver, self.context, self.cluster_obj
+        )
+
     @mock.patch.object(driver.Driver, "_ensure_certificate_secrets")
     @mock.patch.object(driver.Driver, "_create_appcred_secret")
     @mock.patch.object(kubernetes.Client, "load")
