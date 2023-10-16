@@ -76,6 +76,47 @@ capi_helm_opts = [
         default=2,
         help=("Minimum VCPUS for flavor used to " "create a Kubernetes node."),
     ),
+    cfg.StrOpt(
+        "csi_cinder_default_volume_type",
+        help=("Default StorageClass volume type for persistent volumes."),
+    ),
+    cfg.StrOpt(
+        "csi_cinder_reclaim_policy",
+        default="Retain",
+        help=(
+            "Policy for reclaiming dynamically created "
+            "persistent volumes. Can be 'Retain' or 'Delete'."
+        ),
+    ),
+    cfg.BoolOpt(
+        "csi_cinder_allow_volume_expansion",
+        default=True,
+        help=(
+            "Allows the users to resize the volume by "
+            "editing the corresponding PVC object."
+        ),
+    ),
+    cfg.ListOpt(
+        "csi_cinder_allowed_topologies",
+        default=[],
+        help=(
+            "Select the Nodes where the application "
+            "Pods may be scheduled based on Node labels."
+        ),
+    ),
+    cfg.StrOpt(
+        "csi_cinder_fstype",
+        default="ext4",
+        help=("Filesystem type for persistent volumes."),
+    ),
+    cfg.StrOpt(
+        "csi_cinder_volume_binding_mode",
+        default="Immediate",
+        help=(
+            "The volumeBindingMode field controls when "
+            "volume binding and dynamic provisioning should occur."
+        ),
+    ),
 ]
 
 CONF = cfg.CONF
