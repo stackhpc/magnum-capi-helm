@@ -13,15 +13,16 @@ from unittest import mock
 
 from magnum.common import exception
 from magnum.common import neutron
-from magnum.drivers.common import k8s_monitor
 from magnum.objects import fields
 from magnum.tests.unit.db import base
 from magnum.tests.unit.objects import utils as obj_utils
 
 from magnum_capi_helm.common import app_creds
 from magnum_capi_helm.common import ca_certificates
+from magnum_capi_helm.common import capi_monitor
 from magnum_capi_helm import conf
 from magnum_capi_helm import driver
+from magnum_capi_helm import driver_utils
 from magnum_capi_helm import helm
 from magnum_capi_helm import kubernetes
 
@@ -573,7 +574,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
             "magnum-fakeproject",
         )
 
-    @mock.patch.object(k8s_monitor, "K8sMonitor")
+    @mock.patch.object(capi_monitor, "CAPIMonitor")
     def test_get_monitor(self, mock_mon):
         self.driver.get_monitor(self.context, self.cluster_obj)
         mock_mon.assert_called_once_with(self.context, self.cluster_obj)
@@ -955,7 +956,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
     def test_namespace(self):
         self.cluster_obj.project_id = "123-456F"
 
-        namespace = self.driver._namespace(self.cluster_obj)
+        namespace = driver_utils.cluster_namespace(self.cluster_obj)
 
         self.assertEqual("magnum-123456f", namespace)
 
@@ -984,17 +985,17 @@ class ClusterAPIDriverTest(base.DbTestCase):
 
     def test_sanitized_name_no_suffix(self):
         self.assertEqual(
-            "123-456fab", self.driver._sanitized_name("123-456Fab")
+            "123-456fab", driver_utils.sanitized_name("123-456Fab")
         )
 
     def test_sanitized_name_with_suffix(self):
         self.assertEqual(
             "123-456-fab-1-asdf",
-            self.driver._sanitized_name("123-456_Fab!!_1!!", "asdf"),
+            driver_utils.sanitized_name("123-456_Fab!!_1!!", "asdf"),
         )
         self.assertEqual(
             "123-456-fab-1-asdf",
-            self.driver._sanitized_name("123-456_Fab-1", "asdf"),
+            driver_utils.sanitized_name("123-456_Fab-1", "asdf"),
         )
 
     def test_get_kube_version_raises(self):
@@ -1079,7 +1080,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
     def test_get_chart_release_name_length(self):
         self.cluster_obj.stack_id = "foo"
 
-        result = self.driver._get_chart_release_name(self.cluster_obj)
+        result = driver_utils.chart_release_name(self.cluster_obj)
 
         self.assertEqual("foo", result)
 

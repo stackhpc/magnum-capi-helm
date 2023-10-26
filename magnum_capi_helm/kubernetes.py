@@ -135,6 +135,9 @@ class Client(requests.Session):
     def get_capi_cluster(self, name, namespace):
         return Cluster(self).fetch(name, namespace)
 
+    def get_capi_openstackcluster(self, name, namespace):
+        return OpenstackCluster(self).fetch(name, namespace)
+
     def get_kubeadm_control_plane(self, name, namespace):
         return KubeadmControlPlane(self).fetch(name, namespace)
 
@@ -251,6 +254,10 @@ class Secret(Resource):
 
 class Cluster(Resource):
     api_version = "cluster.x-k8s.io/v1beta1"
+
+
+class OpenstackCluster(Resource):
+    api_version = "infrastructure.cluster.x-k8s.io/v1alpha6"
 
 
 class MachineDeployment(Resource):
