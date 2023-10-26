@@ -18,14 +18,15 @@ from magnum.common import exception
 from magnum.common import neutron
 from magnum.common import short_id
 from magnum.drivers.common import driver
-from magnum.drivers.common import k8s_monitor
 from magnum.objects import fields
 from oslo_log import log as logging
 from oslo_utils import uuidutils
 
 from magnum_capi_helm.common import app_creds
 from magnum_capi_helm.common import ca_certificates
+from magnum_capi_helm.common import capi_monitor
 from magnum_capi_helm import conf
+from magnum_capi_helm import driver_utils
 from magnum_capi_helm import helm
 from magnum_capi_helm import kubernetes
 
@@ -73,10 +74,8 @@ class Driver(driver.Driver):
         # The status of the master nodegroup is determined by the Cluster API
         # control plane object
         kcp = self._k8s_client.get_kubeadm_control_plane(
-            self._sanitized_name(
-                self._get_chart_release_name(cluster), "control-plane"
-            ),
-            self._namespace(cluster),
+            driver_utils.get_k8s_resource_name(cluster, "control-plane"),
+            driver_utils.cluster_namespace(cluster),
         )
 
         ng_state = NodeGroupState.NOT_PRESENT
@@ -126,10 +125,8 @@ class Driver(driver.Driver):
         # The status of a worker nodegroup is determined by the corresponding
         # Cluster API machine deployment
         md = self._k8s_client.get_machine_deployment(
-            self._sanitized_name(
-                self._get_chart_release_name(cluster), nodegroup.name
-            ),
-            self._namespace(cluster),
+            driver_utils.get_k8s_resource_name(cluster, nodegroup.name),
+            driver_utils.cluster_namespace(cluster),
         )
 
         ng_state = NodeGroupState.NOT_PRESENT
@@ -230,15 +227,15 @@ class Driver(driver.Driver):
         return nodegroup
 
     def _nodegroup_machines_exist(self, cluster, nodegroup):
-        cluster_name = self._get_chart_release_name(cluster)
-        nodegroup_name = self._sanitized_name(nodegroup.name)
+        cluster_name = driver_utils.chart_release_name(cluster)
+        nodegroup_name = driver_utils.sanitized_name(nodegroup.name)
         machines = self._k8s_client.get_all_machines_by_label(
             {
                 "capi.stackhpc.com/cluster": cluster_name,
                 "capi.stackhpc.com/component": "worker",
                 "capi.stackhpc.com/node-group": nodegroup_name,
             },
-            self._namespace(cluster),
+            driver_utils.cluster_namespace(cluster),
         )
         return bool(machines)
 
@@ -285,11 +282,11 @@ class Driver(driver.Driver):
         # Check the status of the addons
         addons = self._k8s_client.get_addons_by_label(
             {
-                "addons.stackhpc.com/cluster": self._sanitized_name(
-                    self._get_chart_release_name(cluster)
-                ),
+                "addons.stackhpc.com/cluster": driver_utils.chart_release_name(
+                    cluster
+                )
             },
-            self._namespace(cluster),
+            driver_utils.cluster_namespace(cluster),
         )
         for addon in addons:
             addon_phase = addon.get("status", {}).get("phase")
@@ -328,7 +325,7 @@ class Driver(driver.Driver):
         self._k8s_client.delete_all_secrets_by_label(
             "magnum.openstack.org/cluster-uuid",
             cluster.uuid,
-            self._namespace(cluster),
+            driver_utils.cluster_namespace(cluster),
         )
 
         # We also need to clean up the appcred that we made
@@ -339,8 +336,8 @@ class Driver(driver.Driver):
 
     def _get_capi_cluster(self, cluster):
         return self._k8s_client.get_capi_cluster(
-            self._sanitized_name(self._get_chart_release_name(cluster)),
-            self._namespace(cluster),
+            driver_utils.chart_release_name(cluster),
+            driver_utils.cluster_namespace(cluster),
         )
 
     def _update_all_nodegroups_status(self, cluster):
@@ -409,20 +406,11 @@ class Driver(driver.Driver):
             self._update_status_deleting(context, cluster)
 
     def get_monitor(self, context, cluster):
-        # re-use the monitor from the old heat driver,
-        # even though it requires access from magnum conductor
-        return k8s_monitor.K8sMonitor(context, cluster)
-
-    def _namespace(self, cluster):
-        # We create clusters in a project-specific namespace
-        # To generate the namespace, first sanitize the project id
-        project_id = re.sub("[^a-z0-9]", "", cluster.project_id.lower())
-        prefix = CONF.capi_helm.namespace_prefix
-        return f"{prefix}-{project_id}"
+        return capi_monitor.CAPIMonitor(context, cluster)
 
     def _k8s_resource_labels(self, cluster):
         # TODO(johngarbutt) need to check these are safe labels
-        name = self._get_chart_release_name(cluster)
+        name = driver_utils.chart_release_name(cluster)
         return {
             "magnum.openstack.org/project-id": cluster.project_id[:63],
             "magnum.openstack.org/user-id": cluster.user_id[:63],
@@ -439,7 +427,7 @@ class Driver(driver.Driver):
                 "metadata": {"labels": self._k8s_resource_labels(cluster)},
                 "stringData": string_data,
             },
-            self._namespace(cluster),
+            driver_utils.cluster_namespace(cluster),
         )
 
     def _ensure_certificate_secrets(self, context, cluster):
@@ -459,15 +447,13 @@ class Driver(driver.Driver):
             context, cluster
         ).items():
             self._k8s_client.apply_secret(
-                self._sanitized_name(
-                    self._get_chart_release_name(cluster), name
-                ),
+                driver_utils.get_k8s_resource_name(cluster, name),
                 {
                     "metadata": {"labels": self._k8s_resource_labels(cluster)},
                     "type": "cluster.x-k8s.io/secret",
                     "stringData": data,
                 },
-                self._namespace(cluster),
+                driver_utils.cluster_namespace(cluster),
             )
 
     def _label(self, cluster, key, default):
@@ -496,14 +482,7 @@ class Driver(driver.Driver):
             CONF.capi_helm.default_helm_chart_version,
         )
         # NOTE(johngarbutt): filtering untrusted user input
-        return re.sub(r"[^a-z0-9\.\-]+", "", version)
-
-    def _sanitized_name(self, name, suffix=None):
-        return re.sub(
-            "[^a-z0-9]+",
-            "-",
-            (f"{name}-{suffix}" if suffix else name).lower(),
-        )
+        return re.sub(r"[^a-z0-9\.\-\+]+", "", version)
 
     def _get_kube_version(self, image):
         # The image should have a property containing the Kubernetes version
@@ -538,9 +517,7 @@ class Driver(driver.Driver):
         )
 
     def _get_app_cred_name(self, cluster):
-        return self._sanitized_name(
-            self._get_chart_release_name(cluster), "cloud-credentials"
-        )
+        return driver_utils.get_k8s_resource_name(cluster, "cloud-credentials")
 
     def _get_dns_nameservers(self, cluster):
         dns_nameserver = cluster.cluster_template.dns_nameserver
@@ -625,7 +602,7 @@ class Driver(driver.Driver):
             },
             "nodeGroups": [
                 {
-                    "name": self._sanitized_name(ng.name),
+                    "name": driver_utils.sanitized_name(ng.name),
                     "machineFlavor": ng.flavor_id,
                     "machineCount": ng.node_count,
                 }
@@ -686,12 +663,12 @@ class Driver(driver.Driver):
             values = helm.mergeconcat(values, network_details)
 
         self._helm_client.install_or_upgrade(
-            self._get_chart_release_name(cluster),
+            driver_utils.chart_release_name(cluster),
             CONF.capi_helm.helm_chart_name,
             values,
             repo=CONF.capi_helm.helm_chart_repo,
             version=self._get_chart_version(cluster),
-            namespace=self._namespace(cluster),
+            namespace=driver_utils.cluster_namespace(cluster),
         )
 
     def _generate_release_name(self, cluster):
@@ -701,7 +678,7 @@ class Driver(driver.Driver):
         # Make sure no duplicate names
         # by generating 12 character random id
         random_bit = short_id.generate_id()
-        base_name = self._sanitized_name(cluster.name)
+        base_name = driver_utils.sanitized_name(cluster.name)
         # valid release names are 53 chars long
         # and stack_id is 12 characters
         # but we also use this to derive hostnames
@@ -710,9 +687,6 @@ class Driver(driver.Driver):
         cluster.stack_id = f"{trimmed_name}-{random_bit}".lower()
         # be sure to save this before we use it
         cluster.save()
-
-    def _get_chart_release_name(self, cluster):
-        return cluster.stack_id
 
     def create_cluster(self, context, cluster, cluster_create_timeout):
         LOG.info("Starting to create cluster %s", cluster.uuid)
@@ -724,7 +698,9 @@ class Driver(driver.Driver):
 
         # NOTE(johngarbutt) all node groups should already
         # be in the CREATE_IN_PROGRESS state
-        self._k8s_client.ensure_namespace(self._namespace(cluster))
+        self._k8s_client.ensure_namespace(
+            driver_utils.cluster_namespace(cluster)
+        )
         self._create_appcred_secret(context, cluster)
         self._ensure_certificate_secrets(context, cluster)
 
@@ -756,8 +732,8 @@ class Driver(driver.Driver):
         # Note that this just marks the resources for deletion - it does not
         # wait for the resources to be deleted
         self._helm_client.uninstall_release(
-            self._get_chart_release_name(cluster),
-            namespace=self._namespace(cluster),
+            driver_utils.chart_release_name(cluster),
+            namespace=driver_utils.cluster_namespace(cluster),
         )
 
     def resize_cluster(
