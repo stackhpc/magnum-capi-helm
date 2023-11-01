@@ -583,6 +583,9 @@ class Driver(driver.Driver):
     def _get_autoheal_enabled(self, cluster):
         return self._get_label_bool(cluster, "auto_healing_enabled", True)
 
+    def _get_k8s_keystone_auth_enabled(self, cluster):
+        return self._get_label_bool(cluster, "keystone_auth_enabled", True)
+
     def _get_fixed_network_id(self, context, cluster):
         network = cluster.fixed_network
         if not network:
@@ -817,6 +820,25 @@ class Driver(driver.Driver):
                 },
             }
             values = helm.mergeconcat(values, network_details)
+
+        if self._get_k8s_keystone_auth_enabled(cluster):
+            k8s_keystone_auth_config = {
+                "authWebhook": "k8s-keystone-auth",
+                "openstack": {
+                    "k8sKeystoneAuth": {  # addon subchart configuration
+                        "enabled": True,
+                        "values": {
+                            "openstackAuthUrl": context.auth_url,
+                            "projectId": context.project_id,
+                        },
+                    }
+                },
+            }
+            values = helm.mergeconcat(values, k8s_keystone_auth_config)
+            LOG.debug(
+                "Enable K8s keystone auth webhook for"
+                f" project: {context.project_id} auth url: {context.auth_url}"
+            )
 
         self._helm_client.install_or_upgrade(
             driver_utils.chart_release_name(cluster),
