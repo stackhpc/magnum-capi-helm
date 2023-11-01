@@ -25,7 +25,6 @@ from magnum_capi_helm import driver
 from magnum_capi_helm import helm
 from magnum_capi_helm import kubernetes
 
-
 CONF = conf.CONF
 
 
@@ -1187,6 +1186,9 @@ class ClusterAPIDriverTest(base.DbTestCase):
             "machineSSHKeyName": None,
         }
 
+    @mock.patch.object(
+        driver.Driver, "_get_k8s_keystone_auth_enabled", return_value=False
+    )
     @mock.patch.object(neutron, "get_network", autospec=True)
     @mock.patch.object(
         driver.Driver, "_ensure_certificate_secrets", autospec=True
@@ -1203,6 +1205,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_appcred,
         mock_certs,
         mock_get_net,
+        mock_get_keystone_auth_enabled,
     ):
         mock_image.return_value = (
             "imageid1",
@@ -1244,6 +1247,9 @@ class ClusterAPIDriverTest(base.DbTestCase):
         self.assertEqual([], mock_get_net.call_args_list)
 
     @mock.patch.object(
+        driver.Driver, "_get_k8s_keystone_auth_enabled", return_value=False
+    )
+    @mock.patch.object(
         driver.Driver, "_ensure_certificate_secrets", autospec=True
     )
     @mock.patch.object(driver.Driver, "_create_appcred_secret", autospec=True)
@@ -1257,6 +1263,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_load,
         mock_appcred,
         mock_certs,
+        mock_get_keystone_auth_enabled,
     ):
         mock_image.return_value = ("imageid1", "1.27.4", "ubuntu")
         mock_client = mock.MagicMock(spec=kubernetes.Client)
@@ -1293,6 +1300,9 @@ class ClusterAPIDriverTest(base.DbTestCase):
         )
 
     @mock.patch.object(
+        driver.Driver, "_get_k8s_keystone_auth_enabled", return_value=False
+    )
+    @mock.patch.object(
         driver.Driver, "_ensure_certificate_secrets", autospec=True
     )
     @mock.patch.object(driver.Driver, "_create_appcred_secret", autospec=True)
@@ -1306,6 +1316,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_load,
         mock_appcred,
         mock_certs,
+        mock_get_keystone_auth_enabled,
     ):
         mock_image.return_value = ("imageid1", "1.27.4", "ubuntu")
         mock_client = mock.MagicMock(spec=kubernetes.Client)
@@ -1351,6 +1362,9 @@ class ClusterAPIDriverTest(base.DbTestCase):
         )
 
     @mock.patch.object(
+        driver.Driver, "_get_k8s_keystone_auth_enabled", return_value=False
+    )
+    @mock.patch.object(
         driver.Driver, "_ensure_certificate_secrets", autospec=True
     )
     @mock.patch.object(driver.Driver, "_create_appcred_secret", autospec=True)
@@ -1364,6 +1378,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_load,
         mock_appcred,
         mock_certs,
+        mock_get_keystone_auth_enabled,
     ):
         mock_image.return_value = (
             "imageid1",
@@ -1424,6 +1439,9 @@ class ClusterAPIDriverTest(base.DbTestCase):
             self.driver, self.context, self.cluster_obj
         )
 
+    @mock.patch.object(
+        driver.Driver, "_get_k8s_keystone_auth_enabled", return_value=False
+    )
     @mock.patch.object(driver.Driver, "_ensure_certificate_secrets")
     @mock.patch.object(driver.Driver, "_create_appcred_secret")
     @mock.patch.object(kubernetes.Client, "load")
@@ -1436,6 +1454,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_load,
         mock_appcred,
         mock_certs,
+        mock_get_keystone_auth_enabled,
     ):
         mock_image.return_value = (
             "imageid1",
@@ -1469,6 +1488,9 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_appcred.assert_called_once_with(self.context, self.cluster_obj)
         mock_certs.assert_called_once_with(self.context, self.cluster_obj)
 
+    @mock.patch.object(
+        driver.Driver, "_get_k8s_keystone_auth_enabled", return_value=False
+    )
     @mock.patch.object(driver.Driver, "_ensure_certificate_secrets")
     @mock.patch.object(driver.Driver, "_create_appcred_secret")
     @mock.patch.object(kubernetes.Client, "load")
@@ -1481,6 +1503,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_load,
         mock_appcred,
         mock_certs,
+        mock_get_keystone_auth_enabled,
     ):
         mock_image.return_value = (
             "imageid1",
@@ -1511,6 +1534,9 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_certs.assert_called_once_with(self.context, self.cluster_obj)
 
     @mock.patch.object(
+        driver.Driver, "_get_k8s_keystone_auth_enabled", return_value=False
+    )
+    @mock.patch.object(
         driver.Driver, "_ensure_certificate_secrets", autospec=True
     )
     @mock.patch.object(driver.Driver, "_create_appcred_secret", autospec=True)
@@ -1524,6 +1550,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_load,
         mock_appcred,
         mock_certs,
+        mock_get_keystone_auth_enabled,
     ):
         mock_image.return_value = ("imageid1", "1.27.4", "ubuntu")
         mock_client = mock.MagicMock(spec=kubernetes.Client)
@@ -1732,6 +1759,79 @@ class ClusterAPIDriverTest(base.DbTestCase):
             self.cluster_obj.nodegroups[0].as_dict(),
             mock_update.call_args.args[2][0].as_dict(),
         )
+
+    @mock.patch.object(
+        driver.Driver, "_get_k8s_keystone_auth_enabled", return_value=False
+    )
+    @mock.patch.object(neutron, "get_network", autospec=True)
+    @mock.patch.object(
+        driver.Driver, "_ensure_certificate_secrets", autospec=True
+    )
+    @mock.patch.object(driver.Driver, "_create_appcred_secret", autospec=True)
+    @mock.patch.object(kubernetes.Client, "load", autospec=True)
+    @mock.patch.object(driver.Driver, "_get_image_details", autospec=True)
+    @mock.patch.object(helm.Client, "install_or_upgrade", autospec=True)
+    def test_k8s_keystone_auth_not_enabled(
+        self,
+        mock_install,
+        mock_image,
+        mock_load,
+        mock_appcred,
+        mock_certs,
+        mock_get_net,
+        mock_get_keystone_auth_enabled,
+    ):
+        mock_image.return_value = (
+            "imageid1",
+            "1.27.4",
+            "ubuntu",
+        )
+        mock_client = mock.MagicMock(spec=kubernetes.Client)
+        mock_load.return_value = mock_client
+        mock_get_net.side_effect = (
+            lambda c, net, source, target, external: f"{net}-{external}"
+        )
+        self.driver._update_helm_release(self.context, self.cluster_obj)
+        mock_install.assert_called()
+        values = mock_install.call_args.args[3]
+        # self.assertIn("kubernetesVersion", values)
+        # print("values: %s" % values["kubernetesVersion"])
+        self.assertNotIn("authWebhook", values)
+
+    @mock.patch.object(neutron, "get_network", autospec=True)
+    @mock.patch.object(
+        driver.Driver, "_ensure_certificate_secrets", autospec=True
+    )
+    @mock.patch.object(driver.Driver, "_create_appcred_secret", autospec=True)
+    @mock.patch.object(kubernetes.Client, "load", autospec=True)
+    @mock.patch.object(driver.Driver, "_get_image_details", autospec=True)
+    @mock.patch.object(helm.Client, "install_or_upgrade", autospec=True)
+    def test_k8s_keystone_auth_enabled(
+        self,
+        mock_install,
+        mock_image,
+        mock_load,
+        mock_appcred,
+        mock_certs,
+        mock_get_net,
+    ):
+        # CONF.capi_helm.k8s_keystone_auth_enabled = True
+        mock_image.return_value = (
+            "imageid1",
+            "1.27.4",
+            "ubuntu",
+        )
+        mock_client = mock.MagicMock(spec=kubernetes.Client)
+        mock_load.return_value = mock_client
+        mock_get_net.side_effect = (
+            lambda c, net, source, target, external: f"{net}-{external}"
+        )
+        self.driver._update_helm_release(self.context, self.cluster_obj)
+        mock_install.assert_called()
+        values = mock_install.call_args.args[3]
+        self.assertIn("authWebhook", values)
+        k8s_keystone_auth_conf = values["openstack"]["k8sKeystoneAuth"]
+        self.assertEqual(k8s_keystone_auth_conf["enabled"], True)
 
     def test_create_federation(self):
         self.assertRaises(
