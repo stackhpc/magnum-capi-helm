@@ -798,7 +798,7 @@ class IgnitionDriver(Driver):
             "kubernetesVersion": kube_version,
             "machineImageId": image_id,
             "machineSSHKeyName": cluster.keypair or None,
-            "bootstrappingFormat": "ignition",
+            "osDistro": "flatcar",
             "cloudCredentialsSecretName": self._get_app_cred_name(cluster),
             "apiServer": {
                 "enableLoadBalancer": True,
