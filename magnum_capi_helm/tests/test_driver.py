@@ -1094,6 +1094,52 @@ class ClusterAPIDriverTest(base.DbTestCase):
 
         self.assertEqual("1.42.0", version)
 
+    def get_cluster_helm_standard_values(self):
+        """Return standard helm values which can be modified for tests.
+
+        There is little point in multiple tests writing the same dictionary
+        that contains all aspects of a cluster when the side effect they are
+        testing is limited to boot volumes, or keypairs.
+        """
+        app_cred_name = "cluster-example-a-111111111111-cloud-credentials"
+        ext_net_id = self.cluster_obj.cluster_template.external_network_id
+
+        return {
+            "kubernetesVersion": "1.27.4",
+            "machineImageId": "imageid1",
+            "cloudCredentialsSecretName": app_cred_name,
+            "clusterNetworking": {
+                "externalNetworkId": ext_net_id,
+                "internalNetwork": {
+                    "networkFilter": None,
+                    "subnetFilter": None,
+                    "nodeCidr": "10.0.0.0/24",
+                },
+                "dnsNameservers": ["8.8.1.1"],
+            },
+            "apiServer": {
+                "enableLoadBalancer": True,
+                "loadBalancerProvider": "amphora",
+            },
+            "controlPlane": {
+                "machineFlavor": "flavor_small",
+                "machineCount": 3,
+            },
+            "addons": {
+                "monitoring": {"enabled": False},
+                "kubernetesDashboard": {"enabled": True},
+                "ingress": {"enabled": False},
+            },
+            "nodeGroups": [
+                {
+                    "name": "test-worker",
+                    "machineFlavor": "flavor_medium",
+                    "machineCount": 3,
+                },
+            ],
+            "machineSSHKeyName": None,
+        }
+
     @mock.patch.object(neutron, "get_network")
     @mock.patch.object(driver.Driver, "_ensure_certificate_secrets")
     @mock.patch.object(driver.Driver, "_create_appcred_secret")
@@ -1116,50 +1162,14 @@ class ClusterAPIDriverTest(base.DbTestCase):
             lambda c, net, source, target, external: f"{net}-{external}"
         )
 
-        self.cluster_obj.keypair = "kp1"
-
         self.driver.create_cluster(self.context, self.cluster_obj, 10)
 
-        app_cred_name = "cluster-example-a-111111111111-cloud-credentials"
-        ext_net_id = self.cluster_obj.cluster_template.external_network_id
+        expected_values = self.get_cluster_helm_standard_values()
+
         mock_install.assert_called_once_with(
             "cluster-example-a-111111111111",
             "openstack-cluster",
-            {
-                "kubernetesVersion": "1.27.4",
-                "machineImageId": "imageid1",
-                "cloudCredentialsSecretName": app_cred_name,
-                "clusterNetworking": {
-                    "externalNetworkId": ext_net_id,
-                    "internalNetwork": {
-                        "networkFilter": None,
-                        "subnetFilter": None,
-                        "nodeCidr": "10.0.0.0/24",
-                    },
-                    "dnsNameservers": ["8.8.1.1"],
-                },
-                "apiServer": {
-                    "enableLoadBalancer": True,
-                    "loadBalancerProvider": "amphora",
-                },
-                "controlPlane": {
-                    "machineFlavor": "flavor_small",
-                    "machineCount": 3,
-                },
-                "addons": {
-                    "monitoring": {"enabled": False},
-                    "kubernetesDashboard": {"enabled": True},
-                    "ingress": {"enabled": False},
-                },
-                "nodeGroups": [
-                    {
-                        "name": "test-worker",
-                        "machineFlavor": "flavor_medium",
-                        "machineCount": 3,
-                    }
-                ],
-                "machineSSHKeyName": "kp1",
-            },
+            expected_values,
             repo=CONF.capi_helm.helm_chart_repo,
             version=CONF.capi_helm.default_helm_chart_version,
             namespace="magnum-fakeproject",
@@ -1187,63 +1197,18 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_image.return_value = ("imageid1", "1.27.4")
         mock_client = mock.MagicMock(spec=kubernetes.Client)
         mock_load.return_value = mock_client
+
         self.cluster_obj.cluster_template.dns_nameserver = ""
-        self.cluster_obj.keypair = "kp1"
-        self.cluster_obj.cluster_template.labels["extra_network_name"] = "foo"
 
         self.driver.create_cluster(self.context, self.cluster_obj, 10)
 
-        app_cred_name = "cluster-example-a-111111111111-cloud-credentials"
-        ext_net_id = self.cluster_obj.cluster_template.external_network_id
+        expected_values = self.get_cluster_helm_standard_values()
+        expected_values["clusterNetworking"]["dnsNameservers"] = None
+
         mock_install.assert_called_once_with(
             "cluster-example-a-111111111111",
             "openstack-cluster",
-            {
-                "kubernetesVersion": "1.27.4",
-                "machineImageId": "imageid1",
-                "cloudCredentialsSecretName": app_cred_name,
-                "clusterNetworking": {
-                    "externalNetworkId": ext_net_id,
-                    "internalNetwork": {
-                        "networkFilter": None,
-                        "subnetFilter": None,
-                        "nodeCidr": "10.0.0.0/24",
-                    },
-                    "dnsNameservers": None,
-                },
-                "apiServer": {
-                    "enableLoadBalancer": True,
-                    "loadBalancerProvider": "amphora",
-                },
-                "controlPlane": {
-                    "machineFlavor": "flavor_small",
-                    "machineCount": 3,
-                },
-                "addons": {
-                    "monitoring": {"enabled": False},
-                    "kubernetesDashboard": {"enabled": True},
-                    "ingress": {"enabled": False},
-                },
-                "nodeGroups": [
-                    {
-                        "name": "test-worker",
-                        "machineFlavor": "flavor_medium",
-                        "machineCount": 3,
-                    }
-                ],
-                "nodeGroupDefaults": {
-                    "machineNetworking": {
-                        "ports": [
-                            {},
-                            {
-                                "network": {"name": "foo"},
-                                "securityGroups": [],
-                            },
-                        ],
-                    },
-                },
-                "machineSSHKeyName": "kp1",
-            },
+            expected_values,
             repo=CONF.capi_helm.helm_chart_repo,
             version=CONF.capi_helm.default_helm_chart_version,
             namespace="magnum-fakeproject",
@@ -1259,7 +1224,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
     @mock.patch.object(kubernetes.Client, "load")
     @mock.patch.object(driver.Driver, "_get_image_details")
     @mock.patch.object(helm.Client, "install_or_upgrade")
-    def test_create_cluster_no_keypair(
+    def test_create_cluster_with_keypair(
         self,
         mock_install,
         mock_image,
@@ -1270,50 +1235,18 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_image.return_value = ("imageid1", "1.27.4")
         mock_client = mock.MagicMock(spec=kubernetes.Client)
         mock_load.return_value = mock_client
-        self.cluster_obj.keypair = ""
+
+        self.cluster_obj.keypair = "kp1"
 
         self.driver.create_cluster(self.context, self.cluster_obj, 10)
 
-        app_cred_name = "cluster-example-a-111111111111-cloud-credentials"
-        ext_net_id = self.cluster_obj.cluster_template.external_network_id
+        expected_values = self.get_cluster_helm_standard_values()
+        expected_values["machineSSHKeyName"] = "kp1"
+
         mock_install.assert_called_once_with(
             "cluster-example-a-111111111111",
             "openstack-cluster",
-            {
-                "kubernetesVersion": "1.27.4",
-                "machineImageId": "imageid1",
-                "cloudCredentialsSecretName": app_cred_name,
-                "clusterNetworking": {
-                    "externalNetworkId": ext_net_id,
-                    "internalNetwork": {
-                        "networkFilter": None,
-                        "subnetFilter": None,
-                        "nodeCidr": "10.0.0.0/24",
-                    },
-                    "dnsNameservers": ["8.8.1.1"],
-                },
-                "apiServer": {
-                    "enableLoadBalancer": True,
-                    "loadBalancerProvider": "amphora",
-                },
-                "controlPlane": {
-                    "machineFlavor": "flavor_small",
-                    "machineCount": 3,
-                },
-                "addons": {
-                    "monitoring": {"enabled": False},
-                    "kubernetesDashboard": {"enabled": True},
-                    "ingress": {"enabled": False},
-                },
-                "nodeGroups": [
-                    {
-                        "name": "test-worker",
-                        "machineFlavor": "flavor_medium",
-                        "machineCount": 3,
-                    }
-                ],
-                "machineSSHKeyName": None,
-            },
+            expected_values,
             repo=CONF.capi_helm.helm_chart_repo,
             version=CONF.capi_helm.default_helm_chart_version,
             namespace="magnum-fakeproject",
