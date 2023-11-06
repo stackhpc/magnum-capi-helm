@@ -66,6 +66,16 @@ capi_helm_opts = [
             "A cluster label can override this."
         ),
     ),
+    cfg.IntOpt(
+        "minimum_flavor_ram",
+        default=2048,
+        help=("Minimum RAM for flavor used to " "create a Kubernetes node."),
+    ),
+    cfg.IntOpt(
+        "minimum_flavor_vcpus",
+        default=2,
+        help=("Minimum VCPUS for flavor used to " "create a Kubernetes node."),
+    ),
 ]
 
 CONF = cfg.CONF
