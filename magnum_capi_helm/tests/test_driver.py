@@ -26,7 +26,6 @@ from magnum_capi_helm import driver_utils
 from magnum_capi_helm import helm
 from magnum_capi_helm import kubernetes
 
-
 CONF = conf.CONF
 
 
@@ -1188,6 +1187,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
             "machineSSHKeyName": None,
         }
 
+    @mock.patch.object(driver.Driver, "_validate_allowed_flavor")
     @mock.patch.object(neutron, "get_network", autospec=True)
     @mock.patch.object(
         driver.Driver, "_ensure_certificate_secrets", autospec=True
@@ -1204,6 +1204,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_appcred,
         mock_certs,
         mock_get_net,
+        mock_validate_allowed_flavor,
     ):
         mock_image.return_value = (
             "imageid1",
@@ -1244,6 +1245,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         )
         self.assertEqual([], mock_get_net.call_args_list)
 
+    @mock.patch.object(driver.Driver, "_validate_allowed_flavor")
     @mock.patch.object(
         driver.Driver, "_ensure_certificate_secrets", autospec=True
     )
@@ -1258,6 +1260,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_load,
         mock_appcred,
         mock_certs,
+        mock_validate_allowed_flavor,
     ):
         mock_image.return_value = ("imageid1", "1.27.4", "ubuntu")
         mock_client = mock.MagicMock(spec=kubernetes.Client)
@@ -1293,6 +1296,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
             self.driver, self.context, self.cluster_obj
         )
 
+    @mock.patch.object(driver.Driver, "_validate_allowed_flavor")
     @mock.patch.object(
         driver.Driver, "_ensure_certificate_secrets", autospec=True
     )
@@ -1307,6 +1311,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_load,
         mock_appcred,
         mock_certs,
+        mock_validate_allowed_flavor,
     ):
         mock_image.return_value = ("imageid1", "1.27.4", "ubuntu")
         mock_client = mock.MagicMock(spec=kubernetes.Client)
@@ -1351,6 +1356,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
             self.driver, self.context, self.cluster_obj
         )
 
+    @mock.patch.object(driver.Driver, "_validate_allowed_flavor")
     @mock.patch.object(
         driver.Driver, "_ensure_certificate_secrets", autospec=True
     )
@@ -1365,6 +1371,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_load,
         mock_appcred,
         mock_certs,
+        mock_validate_allowed_flavor,
     ):
         mock_image.return_value = (
             "imageid1",
@@ -1425,6 +1432,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
             self.driver, self.context, self.cluster_obj
         )
 
+    @mock.patch.object(driver.Driver, "_validate_allowed_flavor")
     @mock.patch.object(driver.Driver, "_ensure_certificate_secrets")
     @mock.patch.object(driver.Driver, "_create_appcred_secret")
     @mock.patch.object(kubernetes.Client, "load")
@@ -1437,6 +1445,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_load,
         mock_appcred,
         mock_certs,
+        mock_validate_allowed_flavor,
     ):
         mock_image.return_value = (
             "imageid1",
@@ -1470,6 +1479,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_appcred.assert_called_once_with(self.context, self.cluster_obj)
         mock_certs.assert_called_once_with(self.context, self.cluster_obj)
 
+    @mock.patch.object(driver.Driver, "_validate_allowed_flavor")
     @mock.patch.object(driver.Driver, "_ensure_certificate_secrets")
     @mock.patch.object(driver.Driver, "_create_appcred_secret")
     @mock.patch.object(kubernetes.Client, "load")
@@ -1482,6 +1492,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_load,
         mock_appcred,
         mock_certs,
+        mock_validate_allowed_flavor,
     ):
         mock_image.return_value = (
             "imageid1",
@@ -1511,6 +1522,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_appcred.assert_called_once_with(self.context, self.cluster_obj)
         mock_certs.assert_called_once_with(self.context, self.cluster_obj)
 
+    @mock.patch.object(driver.Driver, "_validate_allowed_flavor")
     @mock.patch.object(
         driver.Driver, "_ensure_certificate_secrets", autospec=True
     )
@@ -1525,6 +1537,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_load,
         mock_appcred,
         mock_certs,
+        mock_validate_allowed_flavor,
     ):
         mock_image.return_value = ("imageid1", "1.27.4", "ubuntu")
         mock_client = mock.MagicMock(spec=kubernetes.Client)
@@ -1671,8 +1684,13 @@ class ClusterAPIDriverTest(base.DbTestCase):
         )
         mock_update.assert_called_once_with(self.context, self.cluster_obj)
 
+    @mock.patch.object(driver.Driver, "_validate_allowed_flavor")
     @mock.patch.object(driver.Driver, "_update_helm_release")
-    def test_upgrade_cluster(self, mock_update):
+    def test_upgrade_cluster(
+        self,
+        mock_update,
+        mock_validate_allowed_flavor,
+    ):
         node_group = mock.MagicMock()
         mock_template = mock.MagicMock()
         mock_template.uuid = "foo"
@@ -1689,8 +1707,13 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_update.assert_called_once_with(self.context, self.cluster_obj)
         self.assertEqual("UPDATE_IN_PROGRESS", self.cluster_obj.status)
 
+    @mock.patch.object(driver.Driver, "_validate_allowed_flavor")
     @mock.patch.object(driver.Driver, "_update_helm_release")
-    def test_create_nodegroup(self, mock_update):
+    def test_create_nodegroup(
+        self,
+        mock_update,
+        mock_validate_allowed_flavor,
+    ):
         node_group = mock.MagicMock()
 
         self.driver.create_nodegroup(
@@ -1701,8 +1724,13 @@ class ClusterAPIDriverTest(base.DbTestCase):
         node_group.save.assert_called_once_with()
         self.assertEqual("CREATE_IN_PROGRESS", node_group.status)
 
+    @mock.patch.object(driver.Driver, "_validate_allowed_flavor")
     @mock.patch.object(driver.Driver, "_update_helm_release")
-    def test_update_nodegroup(self, mock_update):
+    def test_update_nodegroup(
+        self,
+        mock_update,
+        mock_validate_allowed_flavor,
+    ):
         node_group = mock.MagicMock()
 
         self.driver.update_nodegroup(
@@ -1756,4 +1784,156 @@ class ClusterAPIDriverTest(base.DbTestCase):
             self.driver.delete_federation,
             self.context,
             None,
+        )
+
+    @mock.patch("novaclient.v2.flavors.FlavorManager", autospec=True)
+    @mock.patch("novaclient.v2.client.Client", autospec=2)
+    @mock.patch("novaclient.client.Client")
+    @mock.patch("magnum.common.clients.OpenStackClients.nova")
+    def test_validate_allowed_flavors_ram_error(
+        self,
+        mock_osc_nova,
+        mock_nova_client,
+        mock_versioned_nova_client,
+        mock_flavor_manager,
+    ):
+        mock_flavor1 = mock.MagicMock(id=1, vcpus=1)
+        mock_flavor1.name = "flavor_tiny"
+        mock_flavor2 = mock.MagicMock(id=2, vcpus=1)
+        mock_flavor2.name = "flavor_small"
+        mock_flavor3 = mock.MagicMock(id=3, vcpus=4)
+        mock_flavor3.name = "flavor_medium"
+        # Assumes that the list returned by novaclient.flavors.(min_ram=xxxx)
+        # is already filtered so no need to check that.
+        filtered_flavors = [
+            mock_flavor1,
+            mock_flavor2,
+            mock_flavor3,
+        ]
+        mock_flavor_manager.list.return_value = filtered_flavors
+        mock_versioned_nova_client.flavors = mock_flavor_manager
+        mock_osc_nova.return_value = mock_versioned_nova_client
+        self.assertRaises(
+            exception.MagnumException,
+            self.driver._validate_allowed_flavor,
+            self.context,
+            "DS9",
+        )
+
+    @mock.patch("novaclient.v2.flavors.FlavorManager", autospec=True)
+    @mock.patch("novaclient.v2.client.Client", autospec=2)
+    @mock.patch("novaclient.client.Client")
+    @mock.patch("magnum.common.clients.OpenStackClients.nova")
+    def test_validate_allowed_flavors_vcpu_error(
+        self,
+        mock_osc_nova,
+        mock_nova_client,
+        mock_versioned_nova_client,
+        mock_flavor_manager,
+    ):
+        mock_flavor1 = mock.MagicMock(id=1, vcpus=1)
+        mock_flavor1.name = "flavor_tiny"
+        mock_flavor2 = mock.MagicMock(id=2, vcpus=1)
+        mock_flavor2.name = "flavor_small"
+        mock_flavor3 = mock.MagicMock(id=3, vcpus=4)
+        mock_flavor3.name = "flavor_medium"
+        # Assumes that the list returned by novaclient.flavors.(min_ram=xxxx)
+        # is already filtered so no need to check that.
+        filtered_flavors = [
+            mock_flavor1,
+            mock_flavor2,
+            mock_flavor3,
+        ]
+        mock_flavor_manager.list.return_value = filtered_flavors
+        mock_versioned_nova_client.flavors = mock_flavor_manager
+        mock_osc_nova.return_value = mock_versioned_nova_client
+        self.assertRaises(
+            exception.MagnumException,
+            self.driver._validate_allowed_flavor,
+            self.context,
+            2,
+        )
+        self.assertRaises(
+            exception.MagnumException,
+            self.driver._validate_allowed_flavor,
+            self.context,
+            "flavor_small",
+        )
+
+    @mock.patch("novaclient.v2.flavors.FlavorManager", autospec=True)
+    @mock.patch("novaclient.v2.client.Client", autospec=2)
+    @mock.patch("novaclient.client.Client")
+    @mock.patch("magnum.common.clients.OpenStackClients.nova")
+    def test_validate_allowed_flavors_ram_ok(
+        self,
+        mock_osc_nova,
+        mock_nova_client,
+        mock_versioned_nova_client,
+        mock_flavor_manager,
+    ):
+        mock_flavor1 = mock.MagicMock(id=1, vcpus=1)
+        mock_flavor1.name = "flavor_tiny"
+        mock_flavor2 = mock.MagicMock(id=2, vcpus=1)
+        mock_flavor2.name = "flavor_small"
+        mock_flavor3 = mock.MagicMock(id=3, vcpus=4)
+        mock_flavor3.name = "flavor_medium"
+        filtered_flavors = [
+            mock_flavor1,
+            mock_flavor2,
+            mock_flavor3,
+        ]
+        mock_flavor_manager.list.return_value = filtered_flavors
+        mock_versioned_nova_client.flavors = mock_flavor_manager
+        mock_osc_nova.return_value = mock_versioned_nova_client
+        try:
+            self.driver._validate_allowed_flavor(self.context, 3)
+        except Exception as e:
+            self.fail("Raised exception %s" % e)
+        try:
+            self.driver._validate_allowed_flavor(self.context, "flavor_medium")
+        except Exception as e:
+            self.fail("Raised exception %s" % e)
+
+    @mock.patch("novaclient.v2.flavors.FlavorManager", autospec=True)
+    @mock.patch("novaclient.v2.client.Client", autospec=2)
+    @mock.patch("novaclient.client.Client")
+    @mock.patch("magnum.common.clients.OpenStackClients.nova")
+    def test_validate_upgrade_cluster_node_group(
+        self,
+        mock_osc_nova,
+        mock_nova_client,
+        mock_versioned_nova_client,
+        mock_flavor_manager,
+    ):
+        mock_flavor1 = mock.MagicMock(id=1, vcpus=1)
+        mock_flavor1.name = "flavor_tiny"
+        mock_flavor2 = mock.MagicMock(id=2, vcpus=1)
+        mock_flavor2.name = "flavor_small"
+        mock_flavor3 = mock.MagicMock(id=3, vcpus=4)
+        mock_flavor3.name = "flavor_medium"
+        filtered_flavors = [
+            mock_flavor1,
+            mock_flavor2,
+            mock_flavor3,
+        ]
+        mock_flavor_manager.list.return_value = filtered_flavors
+        mock_versioned_nova_client.flavors = mock_flavor_manager
+        mock_osc_nova.return_value = mock_versioned_nova_client
+        node_group = mock.MagicMock()
+        node_group.flavor_id
+        mock_template = mock.MagicMock()
+        mock_template.uuid = "foo"
+
+        for ng in self.cluster_obj.nodegroups:
+            if ng.role != "master":
+                ng.flavor_id = "flavor_small"
+                ng.save()
+        self.assertRaises(
+            exception.MagnumException,
+            self.driver.upgrade_cluster,
+            self.context,
+            self.cluster_obj,
+            mock_template,
+            1,
+            node_group,
         )

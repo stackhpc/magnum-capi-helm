@@ -549,6 +549,34 @@ class Driver(driver.Driver):
                 context, network, source="name", target="id", external=False
             )
 
+    def _validate_allowed_flavor(self, context, requested_flavor):
+        # Compare requested flavor with allowed for Kubernetes node
+        flavors = (
+            clients.OpenStackClients(context)
+            .nova()
+            .flavors.list(min_ram=CONF.capi_helm.minimum_flavor_ram)
+        )
+        for flavor in flavors:
+            vcpus = flavor.vcpus
+            LOG.debug(
+                f"Checking if {requested_flavor} matches "
+                f"{flavor.id} or {flavor.name}"
+            )
+            if requested_flavor in [flavor.id, flavor.name]:
+                if vcpus < CONF.capi_helm.minimum_flavor_vcpus:
+                    raise exception.MagnumException(
+                        message=f"Flavor {requested_flavor} does not "
+                        f"have enough CPU to run Kubernetes. "
+                        f"Minimum {CONF.capi_helm.minimum_flavor_vcpus} "
+                        "vcpus required."
+                    )
+                return
+        raise exception.MagnumException(
+            message=f"Flavor {requested_flavor} does not "
+            f"have enough RAM to run Kubernetes. "
+            f"Minimum {CONF.capi_helm.minimum_flavor_ram} MB required."
+        )
+
     def _update_helm_release(self, context, cluster, nodegroups=None):
         if nodegroups is None:
             nodegroups = cluster.nodegroups
@@ -691,6 +719,10 @@ class Driver(driver.Driver):
     def create_cluster(self, context, cluster, cluster_create_timeout):
         LOG.info("Starting to create cluster %s", cluster.uuid)
 
+        self._validate_allowed_flavor(context, cluster.master_flavor_id)
+        nodegroups = cluster.nodegroups
+        for ng in nodegroups:
+            self._validate_allowed_flavor(context, ng.flavor_id)
         # we generate this name (on the initial create call only)
         # so we hit no issues with duplicate cluster names
         # and it makes renaming clusters in the API possible
@@ -766,6 +798,8 @@ class Driver(driver.Driver):
         # So mark them all as having an update in progress
         for nodegroup in cluster.nodegroups:
             nodegroup.status = fields.ClusterStatus.UPDATE_IN_PROGRESS
+            print("Flavor id: %s" % nodegroup.flavor_id)
+            self._validate_allowed_flavor(context, nodegroup.flavor_id)
             nodegroup.save()
 
         # Move the cluster to the new template
@@ -778,12 +812,14 @@ class Driver(driver.Driver):
 
     def create_nodegroup(self, context, cluster, nodegroup):
         nodegroup.status = fields.ClusterStatus.CREATE_IN_PROGRESS
+        self._validate_allowed_flavor(context, nodegroup.flavor_id)
         nodegroup.save()
 
         self._update_helm_release(context, cluster)
 
     def update_nodegroup(self, context, cluster, nodegroup):
         nodegroup.status = fields.ClusterStatus.UPDATE_IN_PROGRESS
+        self._validate_allowed_flavor(context, nodegroup.flavor_id)
         nodegroup.save()
 
         self._update_helm_release(context, cluster)
