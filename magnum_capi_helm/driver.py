@@ -447,7 +447,10 @@ class Driver(driver.Driver):
         # Cluster API looks for specific named secrets for each of the CAs,
         # and generates them if they don't exist, so we create them here
         # with the correct certificates in
-        for (name, data,) in ca_certificates.get_certificate_string_data(
+        for (
+            name,
+            data,
+        ) in ca_certificates.get_certificate_string_data(
             context, cluster
         ).items():
             self._k8s_client.apply_secret(
