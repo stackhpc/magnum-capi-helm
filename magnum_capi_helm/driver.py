@@ -59,7 +59,7 @@ class Driver(driver.Driver):
                 "server_type": "vm",
                 # NOTE(johngarbutt) we don't depend on a specific OS,
                 # we depend on kubeadm images with cloud-init
-                "os": "capi-kubeadm-cloudinit",
+                "os": "ubuntu",
                 "coe": "kubernetes",
             },
         ]

@@ -18,7 +18,5 @@ from magnum_capi_helm.tests import base
 
 class TestMagnumDriverLoads(base.TestCase):
     def test_get_driver(self):
-        cluster_driver = common.Driver.get_driver(
-            "vm", "capi-kubeadm-cloudinit", "kubernetes"
-        )
+        cluster_driver = common.Driver.get_driver("vm", "ubuntu", "kubernetes")
         self.assertIsInstance(cluster_driver, driver.Driver)

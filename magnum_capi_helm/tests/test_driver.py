@@ -51,7 +51,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
             [
                 {
                     "server_type": "vm",
-                    "os": "capi-kubeadm-cloudinit",
+                    "os": "ubuntu",
                     "coe": "kubernetes",
                 }
             ],
