@@ -58,7 +58,7 @@ capi_helm_opts = [
     ),
     cfg.StrOpt(
         "default_helm_chart_version",
-        default="0.1.2-dev.0.main.55",
+        default="0.1.4",
         help=(
             "Version of the helm chart specified "
             "by the config: capi_driver.helm_chart_repo "
