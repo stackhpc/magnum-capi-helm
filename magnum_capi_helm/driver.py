@@ -553,6 +553,8 @@ class Driver(driver.Driver):
 
         network_id = self._get_fixed_network_id(context, cluster)
         subnet_id = neutron.get_fixed_subnet_id(context, cluster.fixed_subnet)
+        kubenetwork_pod_cidr = "172.16.0.0/13"
+        kubenetwork_services_cidr = "172.24.0.0/13"
 
         values = {
             "kubernetesVersion": kube_version,
@@ -579,6 +581,18 @@ class Driver(driver.Driver):
                     "nodeCidr": self._label(
                         cluster, "fixed_subnet_cidr", "10.0.0.0/24"
                     ),
+                },
+            },
+            "kubeNetwork": {
+                "pods": {
+                    "cidrBlocks": [
+                        kubenetwork_pod_cidr,
+                    ],
+                },
+                "services": {
+                    "cidrBlocks": [
+                        kubenetwork_services_cidr,
+                    ],
                 },
             },
             "controlPlane": {

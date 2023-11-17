@@ -1117,6 +1117,18 @@ class ClusterAPIDriverTest(base.DbTestCase):
                 },
                 "dnsNameservers": ["8.8.1.1"],
             },
+            "kubeNetwork": {
+                "pods": {
+                    "cidrBlocks": [
+                        "172.16.0.0/13",
+                    ],
+                },
+                "services": {
+                    "cidrBlocks": [
+                        "172.24.0.0/13",
+                    ],
+                },
+            },
             "apiServer": {
                 "enableLoadBalancer": True,
                 "loadBalancerProvider": "amphora",
@@ -1262,6 +1274,18 @@ class ClusterAPIDriverTest(base.DbTestCase):
                     },
                     "dnsNameservers": ["8.8.1.1"],
                 },
+                "kubeNetwork": {
+                    "pods": {
+                        "cidrBlocks": [
+                            "172.16.0.0/13",
+                        ],
+                    },
+                    "services": {
+                        "cidrBlocks": [
+                            "172.24.0.0/13",
+                        ],
+                    },
+                },
                 "apiServer": {
                     "enableLoadBalancer": True,
                     "loadBalancerProvider": "amphora",
@@ -1352,6 +1376,18 @@ class ClusterAPIDriverTest(base.DbTestCase):
                         "nodeCidr": "10.0.0.0/24",
                     },
                     "dnsNameservers": ["8.8.1.1"],
+                },
+                "kubeNetwork": {
+                    "pods": {
+                        "cidrBlocks": [
+                            "172.16.0.0/13",
+                        ],
+                    },
+                    "services": {
+                        "cidrBlocks": [
+                            "172.24.0.0/13",
+                        ],
+                    },
                 },
                 "apiServer": {
                     "enableLoadBalancer": True,
