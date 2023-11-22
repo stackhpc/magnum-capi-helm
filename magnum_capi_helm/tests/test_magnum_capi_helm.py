@@ -20,3 +20,9 @@ class TestMagnumDriverLoads(base.TestCase):
     def test_get_driver(self):
         cluster_driver = common.Driver.get_driver("vm", "ubuntu", "kubernetes")
         self.assertIsInstance(cluster_driver, driver.Driver)
+
+    def test_get_flatcar_driver(self):
+        cluster_driver = common.Driver.get_driver(
+            "vm", "flatcar", "kubernetes"
+        )
+        self.assertIsInstance(cluster_driver, driver.Driver)

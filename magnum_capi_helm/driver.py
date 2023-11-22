@@ -62,6 +62,11 @@ class Driver(driver.Driver):
                 "os": "ubuntu",
                 "coe": "kubernetes",
             },
+            {
+                "server_type": "vm",
+                "os": "flatcar",
+                "coe": "kubernetes",
+            },
         ]
 
     def _update_control_plane_nodegroup_status(self, cluster, nodegroup):
@@ -502,12 +507,25 @@ class Driver(driver.Driver):
         # TODO(johngarbutt) more validation required?
         return re.sub(r"[^0-9\.]+", "", raw)
 
+    def _get_os_distro(self, image):
+        os_distro = image.get("os_distro")
+        if not os_distro:
+            raise exception.MagnumException(
+                message=f"Image {image.id} does not "
+                "have an os_distro property."
+            )
+        return re.sub(r"[^a-zA-Z0-9\.\-\/ ]+", "", os_distro)
+
     def _get_image_details(self, context, image_identifier):
         osc = clients.OpenStackClients(context)
         image = api_utils.get_openstack_resource(
             osc.glance().images, image_identifier, "images"
         )
-        return image.id, self._get_kube_version(image)
+        return (
+            image.id,
+            self._get_kube_version(image),
+            self._get_os_distro(image),
+        )
 
     def _get_app_cred_name(self, cluster):
         return self._sanitized_name(
@@ -547,7 +565,7 @@ class Driver(driver.Driver):
         if nodegroups is None:
             nodegroups = cluster.nodegroups
 
-        image_id, kube_version = self._get_image_details(
+        image_id, kube_version, os_distro = self._get_image_details(
             context, cluster.cluster_template.image_id
         )
 
@@ -581,6 +599,7 @@ class Driver(driver.Driver):
                     ),
                 },
             },
+            "osDistro": os_distro,
             "controlPlane": {
                 "machineFlavor": cluster.master_flavor_id,
                 "machineCount": cluster.master_count,
