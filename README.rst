@@ -75,9 +75,7 @@ property set when uploaded to Glance. For example:::
     --disk-format qcow2 \
     --container-format bare \
     --public
-  openstack image set ubuntu-focal-kube-v1.28.1 --os-distro capi-kubeadm-cloudinit --os-version 20.04
-    openstack image set ubuntu-focal-kube-v1.28.1 \
-        --os-distro capi-kubeadm-cloudinit
+  openstack image set ubuntu-focal-kube-v1.28.1 --os-distro ubuntu --os-version 20.04
 
 Finally, this means you can now create a template, and then a cluster,
 get the kubeconfig to access it, then run sonaboy to test it,
