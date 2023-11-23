@@ -69,13 +69,13 @@ Images are available in the `manifest.json` file, and are named in the format `u
 The above image needs to have the correct os-distro
 property set when uploaded to Glance. For example:::
 
-  curl -fo ubuntu-focal-kube-v1.28.1-230831-1150.qcow2 'https://object.arcus.openstack.hpc.cam.ac.uk/azimuth-images/ubuntu-focal-kube-v1.28.1-230831-1150.qcow2?AWSAccessKeyId=c5bd0fa15bae4e08b305a52aac97c3a6&Expires=1725019898&Signature=%2FXW2ywkA%2FQ8bCUiJkiLCWBAf81M%3D'
-  openstack image create ubuntu-focal-kube-v1.28.1 \
-    --file ubuntu-focal-kube-v1.28.1-230831-1150.qcow2  \
+  curl -fo ubuntu.qcow 'https://object.arcus.openstack.hpc.cam.ac.uk/azimuth-images/ubuntu-jammy-kube-v1.28.3-231030-1102.qcow2?AWSAccessKeyId=c5bd0fa15bae4e08b305a52aac97c3a6&Expires=1730200795&Signature=gs9Fk7y06cpViQHP04TmHDtmkWE%3D'
+  openstack image create ubuntu-jammy-kube-v1.28.3 \
+    --file ubuntu.qcow2  \
     --disk-format qcow2 \
     --container-format bare \
     --public
-  openstack image set ubuntu-focal-kube-v1.28.1 --os-distro ubuntu --os-version 20.04
+  openstack image set ubuntu-jammy-kube-v1.28.3 --os-distro ubuntu --os-version 22.04
 
 Finally, this means you can now create a template, and then a cluster,
 get the kubeconfig to access it, then run sonaboy to test it,
@@ -84,7 +84,7 @@ doing something like this:::
   openstack coe cluster template create new_driver \
     --coe kubernetes \
     --label octavia_provider=ovn \
-    --image $(openstack image show ubuntu-focal-kube-v1.28.1 -c id -f value) \
+    --image $(openstack image show ubuntu-jammy-kube-v1.28.3 -c id -f value) \
     --external-network public \
     --master-flavor ds2G20 \
     --flavor ds2G20 \
