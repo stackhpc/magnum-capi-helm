@@ -480,6 +480,16 @@ class Driver(driver.Driver):
         # NOTE(johngarbutt): filtering untrusted user input
         return re.sub(r"[^a-zA-Z0-9\.\-\/ ]+", "", raw)
 
+    def _get_label_bool(self, cluster, label, default):
+        cluster_label = self._label(cluster, label, "")
+        if not cluster_label:
+            return default
+        if default:
+            # Default is on, so return for any value except "false"
+            return cluster_label != "false"
+        # Default is False, so only "true" responds with True
+        return cluster_label == "true"
+
     def _get_chart_version(self, cluster):
         version = cluster.cluster_template.labels.get(
             "capi_helm_chart_version",
@@ -540,15 +550,16 @@ class Driver(driver.Driver):
             return None
 
     def _get_monitoring_enabled(self, cluster):
-        mon_label = self._label(cluster, "monitoring_enabled", "")
-        # NOTE(mkjpryor) default of, like heat driver,
-        # as requires cinder and takes a while
-        return mon_label == "true"
+        #  NOTE(mkjpryor) default off, like heat driver,
+        #  as requires cinder and takes a while
+        return self._get_label_bool(cluster, "monitoring_enabled", False)
 
     def _get_kube_dash_enabled(self, cluster):
-        kube_dash_label = self._label(cluster, "kube_dashboard_enabled", "")
-        # NOTE(mkjpryor) default on, like the heat driver
-        return kube_dash_label != "false"
+        #  NOTE(mkjpryor) default on, like the heat driver
+        return self._get_label_bool(cluster, "kube_dashboard_enabled", True)
+
+    def _get_autoheal_enabled(self, cluster):
+        return self._get_label_bool(cluster, "auto_healing_enabled", True)
 
     def _get_fixed_network_id(self, context, cluster):
         network = cluster.fixed_network
@@ -603,6 +614,14 @@ class Driver(driver.Driver):
             "controlPlane": {
                 "machineFlavor": cluster.master_flavor_id,
                 "machineCount": cluster.master_count,
+                "healthCheck": {
+                    "enabled": self._get_autoheal_enabled(cluster),
+                },
+            },
+            "nodeGroupDefaults": {
+                "healthCheck": {
+                    "enabled": self._get_autoheal_enabled(cluster),
+                },
             },
             "nodeGroups": [
                 {
