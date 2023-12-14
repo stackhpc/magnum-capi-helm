@@ -239,7 +239,7 @@ openstack image create ubuntu-focal-kube-v1.27.5 \
   --disk-format qcow2 \
   --container-format bare \
   --public
-openstack image set ubuntu-focal-kube-v1.27.5 --os-distro capi-kubeadm-cloudinit --os-version 20.04
+openstack image set ubuntu-focal-kube-v1.27.5 --os-distro ubuntu --os-version 20.04
 openstack image set ubuntu-focal-kube-v1.27.5 --property kube_version=v1.27.5
 
 curl -fo ubuntu-focal-kube-v1.28.1-230831-1150.qcow2 'https://object.arcus.openstack.hpc.cam.ac.uk/azimuth-images/ubuntu-focal-kube-v1.28.1-230831-1150.qcow2?AWSAccessKeyId=c5bd0fa15bae4e08b305a52aac97c3a6&Expires=1725019898&Signature=%2FXW2ywkA%2FQ8bCUiJkiLCWBAf81M%3D'
@@ -248,7 +248,7 @@ openstack image create ubuntu-focal-kube-v1.28.1 \
   --disk-format qcow2 \
   --container-format bare \
   --public
-openstack image set ubuntu-focal-kube-v1.28.1 --os-distro capi-kubeadm-cloudinit --os-version 20.04
+openstack image set ubuntu-focal-kube-v1.28.1 --os-distro ubuntu --os-version 20.04
 openstack image set ubuntu-focal-kube-v1.28.1 --property kube_version=v1.28.1
 
 #
