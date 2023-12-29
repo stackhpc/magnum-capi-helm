@@ -28,25 +28,30 @@ LOG = logging.getLogger(__name__)
 CONF = conf.CONF
 
 
-def file_or_data(obj, file_key):
-    """Returns a path to a file containing the requested data.
+def ensure_file_cert(obj, file_key):
+    """Returns the path and cleanup requirements of cert.
+
+    Returns a tuple containing the path to a file with the requesteddata,
+    and whether the file must be cleaned up.
 
     First check if there is a file path already,
     if the data is there, put it in a file,
-    and return a path to the temp directory
+    remember for cleanup and return the created file.
     """
     if file_key in obj:
-        return obj[file_key]
+        return obj[file_key], False
 
     data_key = file_key + "-data"
     if data_key in obj:
-        # TODO(johngarbutt) check permissions on this file!
-        # and check how it gets deleted
+        # NOTE(dalees): The created file may contain private key material
+        # but is owned by the current user and mode 0600.
+        # See also: tempfile.mkstemp
+        # In Python 3.12, cleanup may be improved with
+        # delete=True,delete_on_close=False
         with tempfile.NamedTemporaryFile(delete=False) as fd:
             fd.write(base64.standard_b64decode(obj[data_key]))
-        return fd.name
-
-    return None
+        return fd.name, True
+    return None, False
 
 
 class Client(requests.Session):
@@ -56,17 +61,39 @@ class Client(requests.Session):
 
     def __init__(self, kubeconfig):
         super().__init__()
+        self.tempfiles = []
         cluster, user = self._get_cluster_and_user(kubeconfig)
 
         self.server = cluster["server"].rstrip("/")
-        ca_file = file_or_data(cluster, "certificate-authority")
+        ca_file, cleanup_file = ensure_file_cert(
+            cluster, "certificate-authority"
+        )
+        if cleanup_file:
+            self.tempfiles.append(ca_file)
         if ca_file:
             self.verify = ca_file
 
         # convert certs into files as required by requests
-        client_cert = file_or_data(user, "client-certificate")
+        # https://requests.readthedocs.io/en/latest/api/#requests.Session.cert
+        client_cert, cleanup_file = ensure_file_cert(
+            user, "client-certificate"
+        )
+        if cleanup_file:
+            self.tempfiles.append(client_cert)
         assert client_cert is not None
-        self.cert = (client_cert, file_or_data(user, "client-key"))
+        client_key, cleanup_file = ensure_file_cert(user, "client-key")
+        if cleanup_file:
+            self.tempfiles.append(client_key)
+        assert client_key is not None
+        self.cert = (client_cert, client_key)
+
+    def __del__(self):
+        # Remove any temporary certificate files this class owns.
+        for file_path in self.tempfiles:
+            if not file_path:
+                continue
+            os.remove(file_path)
+        self.tempfiles = []
 
     def _get_cluster_and_user(self, kubeconfig):
         # get the context
