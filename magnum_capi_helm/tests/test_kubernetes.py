@@ -47,13 +47,16 @@ TEST_KUBECONFIG = yaml.safe_load(TEST_KUBECONFIG_YAML)
 
 
 class TestKubernetesClient(base.TestCase):
+    # Basic lookup, non "-data" key
     def test_file_or_data(self):
-        data = kubernetes.file_or_data(dict(key="mydata"), "key")
+        data, cleanup = kubernetes.ensure_file_cert(dict(key="mydata"), "key")
         self.assertEqual("mydata", data)
+        self.assertFalse(cleanup)
 
+    # Lookup with a "-data" key, requiring temporary file
     @mock.patch.object(tempfile, "NamedTemporaryFile")
     def test_file_or_data_create_temp(self, mock_temp):
-        data = kubernetes.file_or_data(
+        data, cleanup = kubernetes.ensure_file_cert(
             {"key-data": base64.b64encode(b"mydata").decode("utf-8")}, "key"
         )
         mock_temp.assert_has_calls(
@@ -65,10 +68,13 @@ class TestKubernetesClient(base.TestCase):
             ]
         )
         self.assertEqual(mock_temp().__enter__().name, data)
+        self.assertTrue(cleanup)
 
+    # Lookup with no key, expecting no error, and no data returned.
     def test_file_or_data_missing(self):
-        data = kubernetes.file_or_data(dict(), "key")
+        data, cleanup = kubernetes.ensure_file_cert(dict(), "key")
         self.assertIsNone(data)
+        self.assertFalse(cleanup)
 
     def test_client_constructor(self):
         client = kubernetes.Client(TEST_KUBECONFIG)
@@ -76,6 +82,35 @@ class TestKubernetesClient(base.TestCase):
         self.assertEqual(TEST_SERVER, client.server)
         self.assertEqual("cafile", client.verify)
         self.assertEqual(("certfile", "keyfile"), client.cert)
+
+    @mock.patch.object(tempfile, "NamedTemporaryFile")
+    @mock.patch.object(os, "remove")
+    def test_client_certificate_finalizer(self, mock_remove, mock_temp):
+        kubeconfig = yaml.safe_load(TEST_KUBECONFIG_YAML)
+
+        # Set -data in base64 to create tmp files.
+        del kubeconfig["users"][0]["user"]["client-certificate"]
+        kubeconfig["users"][0]["user"][
+            "client-certificate-data"
+        ] = base64.b64encode(b"client cert data").decode("utf-8")
+
+        client = kubernetes.Client(kubeconfig)
+
+        # Ensure a temporary file was created
+        mock_temp.assert_has_calls(
+            [
+                mock.call(delete=False),
+                mock.call().__enter__(),
+                mock.call().__enter__().write(b"client cert data"),
+                mock.call().__exit__(None, None, None),
+            ]
+        )
+
+        # Call finalizer method directly
+        client.__del__()
+
+        # Exactly one temp file should be cleaned up
+        mock_remove.assert_called_once()
 
     def test_get_kubeconfig_path_default(self):
         self.assertEqual(
