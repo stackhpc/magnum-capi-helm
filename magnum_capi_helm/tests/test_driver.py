@@ -25,7 +25,6 @@ from magnum_capi_helm import driver
 from magnum_capi_helm import helm
 from magnum_capi_helm import kubernetes
 
-
 CONF = conf.CONF
 
 
@@ -1172,6 +1171,12 @@ class ClusterAPIDriverTest(base.DbTestCase):
                 "monitoring": {"enabled": False},
                 "kubernetesDashboard": {"enabled": True},
                 "ingress": {"enabled": False},
+                "openstack": {
+                    "csiCinder": {
+                        "defaultStorageClass": mock.ANY,
+                        "additionalStorageClasses": mock.ANY,
+                    }
+                },
             },
             "nodeGroups": [
                 {
@@ -1187,6 +1192,11 @@ class ClusterAPIDriverTest(base.DbTestCase):
             "machineSSHKeyName": None,
         }
 
+    @mock.patch.object(
+        driver.Driver,
+        "_storageclass_definitions",
+        return_value=(mock.ANY, mock.ANY),
+    )
     @mock.patch.object(neutron, "get_network", autospec=True)
     @mock.patch.object(
         driver.Driver, "_ensure_certificate_secrets", autospec=True
@@ -1203,6 +1213,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_appcred,
         mock_certs,
         mock_get_net,
+        mock_storageclasses,
     ):
         mock_image.return_value = (
             "imageid1",
@@ -1244,6 +1255,11 @@ class ClusterAPIDriverTest(base.DbTestCase):
         self.assertEqual([], mock_get_net.call_args_list)
 
     @mock.patch.object(
+        driver.Driver,
+        "_storageclass_definitions",
+        return_value=(mock.ANY, mock.ANY),
+    )
+    @mock.patch.object(
         driver.Driver, "_ensure_certificate_secrets", autospec=True
     )
     @mock.patch.object(driver.Driver, "_create_appcred_secret", autospec=True)
@@ -1257,6 +1273,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_load,
         mock_appcred,
         mock_certs,
+        mock_storageclasses,
     ):
         mock_image.return_value = ("imageid1", "1.27.4", "ubuntu")
         mock_client = mock.MagicMock(spec=kubernetes.Client)
@@ -1293,6 +1310,11 @@ class ClusterAPIDriverTest(base.DbTestCase):
         )
 
     @mock.patch.object(
+        driver.Driver,
+        "_storageclass_definitions",
+        return_value=(mock.ANY, mock.ANY),
+    )
+    @mock.patch.object(
         driver.Driver, "_ensure_certificate_secrets", autospec=True
     )
     @mock.patch.object(driver.Driver, "_create_appcred_secret", autospec=True)
@@ -1306,6 +1328,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_load,
         mock_appcred,
         mock_certs,
+        mock_storageclasses,
     ):
         mock_image.return_value = ("imageid1", "1.27.4", "ubuntu")
         mock_client = mock.MagicMock(spec=kubernetes.Client)
@@ -1351,6 +1374,11 @@ class ClusterAPIDriverTest(base.DbTestCase):
         )
 
     @mock.patch.object(
+        driver.Driver,
+        "_storageclass_definitions",
+        return_value=(mock.ANY, mock.ANY),
+    )
+    @mock.patch.object(
         driver.Driver, "_ensure_certificate_secrets", autospec=True
     )
     @mock.patch.object(driver.Driver, "_create_appcred_secret", autospec=True)
@@ -1364,6 +1392,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_load,
         mock_appcred,
         mock_certs,
+        mock_storageclasses,
     ):
         mock_image.return_value = (
             "imageid1",
@@ -1424,6 +1453,11 @@ class ClusterAPIDriverTest(base.DbTestCase):
             self.driver, self.context, self.cluster_obj
         )
 
+    @mock.patch.object(
+        driver.Driver,
+        "_storageclass_definitions",
+        return_value=(mock.ANY, mock.ANY),
+    )
     @mock.patch.object(driver.Driver, "_ensure_certificate_secrets")
     @mock.patch.object(driver.Driver, "_create_appcred_secret")
     @mock.patch.object(kubernetes.Client, "load")
@@ -1436,6 +1470,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_load,
         mock_appcred,
         mock_certs,
+        mock_storageclasses,
     ):
         mock_image.return_value = (
             "imageid1",
@@ -1469,6 +1504,11 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_appcred.assert_called_once_with(self.context, self.cluster_obj)
         mock_certs.assert_called_once_with(self.context, self.cluster_obj)
 
+    @mock.patch.object(
+        driver.Driver,
+        "_storageclass_definitions",
+        return_value=(mock.ANY, mock.ANY),
+    )
     @mock.patch.object(driver.Driver, "_ensure_certificate_secrets")
     @mock.patch.object(driver.Driver, "_create_appcred_secret")
     @mock.patch.object(kubernetes.Client, "load")
@@ -1481,6 +1521,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_load,
         mock_appcred,
         mock_certs,
+        mock_storageclasses,
     ):
         mock_image.return_value = (
             "imageid1",
@@ -1511,6 +1552,11 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_certs.assert_called_once_with(self.context, self.cluster_obj)
 
     @mock.patch.object(
+        driver.Driver,
+        "_storageclass_definitions",
+        return_value=(mock.ANY, mock.ANY),
+    )
+    @mock.patch.object(
         driver.Driver, "_ensure_certificate_secrets", autospec=True
     )
     @mock.patch.object(driver.Driver, "_create_appcred_secret", autospec=True)
@@ -1524,6 +1570,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_load,
         mock_appcred,
         mock_certs,
+        mock_storageclasses,
     ):
         mock_image.return_value = ("imageid1", "1.27.4", "ubuntu")
         mock_client = mock.MagicMock(spec=kubernetes.Client)
@@ -1631,6 +1678,94 @@ class ClusterAPIDriverTest(base.DbTestCase):
             self.context, self.cluster_obj
         )
         mock_labels.assert_called_with(self.cluster_obj)
+
+    @mock.patch("magnum.common.clients.OpenStackClients.cinder_region_name")
+    @mock.patch("magnum.common.clients.OpenStackClients.cinder")
+    def test_get_storage_classes(self, mock_cinder, mock_osc_rn):
+        CONF.capi_helm.csi_cinder_default_volume_type = "type3"
+        mock_osc_rn.return_value = "middle_earth_east"
+        mock_vol_type_1 = mock.MagicMock()
+        mock_vol_type_1.name = "type1"
+        mock_vol_type_2 = mock.MagicMock()
+        mock_vol_type_2.name = "type2"
+        mock_vol_type_3 = mock.MagicMock()
+        mock_vol_type_3.name = "type3"
+        mock_volume_types = mock.Mock()
+        mock_volume_types.list.return_value = [
+            mock_vol_type_1,
+            mock_vol_type_2,
+            mock_vol_type_3,
+        ]
+        mock_cinder_client = mock.Mock()
+        mock_cinder_client.volume_types = mock_volume_types
+        mock_cinder.return_value = mock_cinder_client
+        (
+            default_storage,
+            additional_storage,
+        ) = self.driver._storageclass_definitions(self.context)
+        self.assertIsInstance(default_storage, dict)
+        self.assertIsInstance(additional_storage, list)
+        self.assertEqual("type3", default_storage["volumeType"])
+        self.assertEqual(
+            "middle_earth_east", additional_storage[0]["availabilityZone"]
+        )
+
+    @mock.patch("magnum.common.clients.OpenStackClients.cinder_region_name")
+    @mock.patch("magnum.common.clients.OpenStackClients.cinder")
+    def test_get_storage_class_volume_type_not_available(
+        self, mock_cinder, mock_osc_rn
+    ):
+        CONF.capi_helm.csi_cinder_default_volume_type = "type4"
+        mock_osc_rn.return_value = "middle_earth_east"
+        mock_vol_type_1 = mock.MagicMock()
+        mock_vol_type_1.name = "type1"
+        mock_vol_type_2 = mock.MagicMock()
+        mock_vol_type_2.name = "type2"
+        mock_vol_type_3 = mock.MagicMock()
+        mock_vol_type_3.name = "type3"
+        mock_volume_types = mock.Mock()
+        mock_volume_types.list.return_value = [
+            mock_vol_type_1,
+            mock_vol_type_2,
+            mock_vol_type_3,
+        ]
+        mock_cinder_client = mock.Mock()
+        mock_cinder_client.volume_types = mock_volume_types
+        mock_cinder.return_value = mock_cinder_client
+        self.assertRaisesRegex(
+            exception.MagnumException,
+            r"not\sa\svalid\sCinder",
+            self.driver._storageclass_definitions,
+            self.context,
+        )
+
+    @mock.patch("magnum.common.clients.OpenStackClients.cinder_region_name")
+    @mock.patch("magnum.common.clients.OpenStackClients.cinder")
+    def test_get_storage_class_volume_type_not_defined(
+        self, mock_cinder, mock_osc_rn
+    ):
+        CONF.capi_helm.csi_cinder_default_volume_type = None
+        mock_osc_rn.return_value = "middle_earth_east"
+        mock_vol_type_1 = mock.MagicMock()
+        mock_vol_type_1.name = "type1"
+        mock_vol_type_2 = mock.MagicMock()
+        mock_vol_type_2.name = "type2"
+        mock_vol_type_3 = mock.MagicMock()
+        mock_vol_type_3.name = "type3"
+        mock_volume_types = mock.Mock()
+        mock_volume_types.list.return_value = [
+            mock_vol_type_1,
+            mock_vol_type_2,
+            mock_vol_type_3,
+        ]
+        mock_cinder_client = mock.Mock()
+        mock_cinder_client.volume_types = mock_volume_types
+        mock_cinder.return_value = mock_cinder_client
+        (
+            default_storage,
+            additional_storage,
+        ) = self.driver._storageclass_definitions(self.context)
+        self.assertEqual("type1", default_storage["volumeType"])
 
     @mock.patch.object(helm.Client, "uninstall_release")
     def test_delete_cluster(self, mock_uninstall):

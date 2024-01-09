@@ -572,6 +572,60 @@ class Driver(driver.Driver):
                 context, network, source="name", target="id", external=False
             )
 
+    def _storageclass_definitions(self, context):
+        """Query cinder API to retrieve list of available volume types.
+
+        @return tuple(dict,list(dict)) containing storage classes
+        """
+        LOG.debug("Retrieve volume types from cinder for StorageClasses.")
+        client = clients.OpenStackClients(context)
+        region_name = client.cinder_region_name()
+        c_client = client.cinder()
+        volume_types = [i.name for i in c_client.volume_types.list()]
+        # Use the default volume type if defined. Otherwise use the first
+        # type returned by cinder.
+        default_volume_type = CONF.capi_helm.csi_cinder_default_volume_type
+        LOG.debug(
+            f"Default volume type: {default_volume_type}"
+            f" Volume types: {volume_types}"
+        )
+        if not default_volume_type:
+            default_volume_type = volume_types[0]
+            LOG.warning(
+                f"Default volume type not defined."
+                f" Using {default_volume_type}."
+            )
+        elif default_volume_type not in volume_types:
+            # If default does not exist throw an error.
+            raise exception.MagnumException(
+                message=f"{default_volume_type} is not a"
+                " valid Cinder volume type."
+            )
+        default_storage_class = {}
+        additional_storage_classes = []
+        allow_expansion = CONF.capi_helm.csi_cinder_allow_volume_expansion
+        reclaim_policy = CONF.capi_helm.csi_cinder_reclaim_policy
+        allowed_topologies = CONF.capi_helm.csi_cinder_allowed_topologies
+        fstype = CONF.capi_helm.csi_cinder_fstype
+        # TODO(travis): Re-evaluate once
+        # https://github.com/stackhpc/capi-helm-charts/pull/32 is merged.
+        for volume_type in volume_types:
+            storage_class = {
+                "name": volume_type,
+                "reclaimPolicy": reclaim_policy,
+                "allowVolumeExpansion": allow_expansion,
+                "availabilityZone": region_name,
+                "volumeType": volume_type,
+                "allowedTopologies": allowed_topologies,
+                "fstype": fstype,
+                "enabled": True,
+            }
+            if volume_type == default_volume_type:
+                default_storage_class = storage_class
+            else:
+                additional_storage_classes.append(storage_class)
+        return (default_storage_class, additional_storage_classes)
+
     def _update_helm_release(self, context, cluster, nodegroups=None):
         if nodegroups is None:
             nodegroups = cluster.nodegroups
@@ -582,6 +636,10 @@ class Driver(driver.Driver):
 
         network_id = self._get_fixed_network_id(context, cluster)
         subnet_id = neutron.get_fixed_subnet_id(context, cluster.fixed_subnet)
+        (
+            default_storageclass,
+            add_storageclasses,
+        ) = self._storageclass_definitions(context)
 
         values = {
             "kubernetesVersion": kube_version,
@@ -633,6 +691,12 @@ class Driver(driver.Driver):
                 if ng.role != NODE_GROUP_ROLE_CONTROLLER
             ],
             "addons": {
+                "openstack": {
+                    "csiCinder": {
+                        "defaultStorageClass": default_storageclass,
+                        "additionalStorageClasses": add_storageclasses,
+                    }
+                },
                 "monitoring": {
                     "enabled": self._get_monitoring_enabled(cluster)
                 },
