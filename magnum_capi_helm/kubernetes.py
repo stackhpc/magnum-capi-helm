@@ -61,15 +61,15 @@ class Client(requests.Session):
 
     def __init__(self, kubeconfig):
         super().__init__()
-        self.tempfiles = []
+        self._tempfiles = []
         cluster, user = self._get_cluster_and_user(kubeconfig)
 
         self.server = cluster["server"].rstrip("/")
         ca_file, cleanup_file = ensure_file_cert(
             cluster, "certificate-authority"
         )
-        if cleanup_file:
-            self.tempfiles.append(ca_file)
+        if cleanup_file and ca_file:
+            self._tempfiles.append(ca_file)
         if ca_file:
             self.verify = ca_file
 
@@ -78,22 +78,23 @@ class Client(requests.Session):
         client_cert, cleanup_file = ensure_file_cert(
             user, "client-certificate"
         )
-        if cleanup_file:
-            self.tempfiles.append(client_cert)
+        if cleanup_file and client_cert:
+            self._tempfiles.append(client_cert)
         assert client_cert is not None
         client_key, cleanup_file = ensure_file_cert(user, "client-key")
-        if cleanup_file:
-            self.tempfiles.append(client_key)
+        if cleanup_file and client_key:
+            self._tempfiles.append(client_key)
         assert client_key is not None
         self.cert = (client_cert, client_key)
 
     def __del__(self):
         # Remove any temporary certificate files this class owns.
-        for file_path in self.tempfiles:
-            if not file_path:
-                continue
-            os.remove(file_path)
-        self.tempfiles = []
+        for file_path in self._tempfiles:
+            try:
+                os.remove(file_path)
+            except (OSError, FileNotFoundError):
+                pass
+        self._tempfiles = []
 
     def _get_cluster_and_user(self, kubeconfig):
         # get the context
