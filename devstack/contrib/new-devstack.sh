@@ -252,7 +252,7 @@ K8S_1_27_NAME=$(echo "$AZIMUTH_IMAGES" | jq -r '.["kubernetes-1-27-jammy"].name'
 K8S_1_27_URL=$(echo "$AZIMUTH_IMAGES" | jq -r '.["kubernetes-1-27-jammy"].url')
 K8S_1_27_VERSION=$(echo "$AZIMUTH_IMAGES" | jq -r '.["kubernetes-1-27-jammy"].kubernetes_version')
 
-#curl -o "$K8S_1_27_NAME.qcow2" "$K8S_1_27_URL"
+curl -o "$K8S_1_27_NAME.qcow2" "$K8S_1_27_URL"
 
 openstack image create "$K8S_1_27_NAME" \
 --file "$K8S_1_27_NAME.qcow2" \
@@ -268,7 +268,7 @@ K8S_1_28_NAME=$(echo "$AZIMUTH_IMAGES" | jq -r '.["kubernetes-1-28-jammy"].name'
 K8S_1_28_URL=$(echo "$AZIMUTH_IMAGES" | jq -r '.["kubernetes-1-28-jammy"].url')
 K8S_1_28_VERSION=$(echo "$AZIMUTH_IMAGES" | jq -r '.["kubernetes-1-28-jammy"].kubernetes_version')
 
-#curl -o "$K8S_1_28_NAME.qcow2" "$K8S_1_28_URL"
+curl -o "$K8S_1_28_NAME.qcow2" "$K8S_1_28_URL"
 
 openstack image create "$K8S_1_28_NAME" \
 --file "$K8S_1_28_NAME.qcow2" \
