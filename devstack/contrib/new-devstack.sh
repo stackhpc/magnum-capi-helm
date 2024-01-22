@@ -12,7 +12,7 @@ set -ex
 
 # Set up the packages we need. Ubuntu package manager is assumed.
 sudo apt-get update
-sudo apt-get install git vim apparmor apparmor-utils -y
+sudo apt-get install git vim apparmor apparmor-utils jq -y
 
 # Clone the devstack repo
 sudo mkdir -p /opt/stack
@@ -168,6 +168,21 @@ sudo chmod go+rw `tty`
 # Stack that stack!
 /opt/stack/stack.sh
 
+# Get latest capi-helm-charts tag
+LATEST_TAG=$(curl -fsL https://api.github.com/repos/stackhpc/capi-helm-charts/tags | jq -r '.[].name' | head -n 1)
+# Curl the dependencies URL
+DEPENDENCIES_JSON=$(curl -fsL https://github.com/stackhpc/capi-helm-charts/releases/download/$LATEST_TAG/dependencies.json)
+
+# Parse JSON into bash variables
+ADDON_PROVIDER=$(echo $DEPENDENCIES_JSON | jq -r '.["addon-provider"]')
+AZIMUTH_IMAGES_TAG=$(echo $DEPENDENCIES_JSON | jq -r '.["azimuth-images"]')
+CLUSTER_API=$(echo $DEPENDENCIES_JSON | jq -r '.["cluster-api"]')
+CLUSTER_API_JANITOR_OPENSTACK=$(echo $DEPENDENCIES_JSON | jq -r '.["cluster-api-janitor-openstack"]')
+CLUSTER_API_PROVIDER_OPENSTACK=$(echo $DEPENDENCIES_JSON | jq -r '.["cluster-api-provider-openstack"]')
+CERT_MANAGER=$(echo $DEPENDENCIES_JSON | jq -r '.["cert-manager"]')
+HELM=$(echo $DEPENDENCIES_JSON | jq -r '.["helm"]')
+SONOBUOY=$(echo $DEPENDENCIES_JSON | jq -r '.["sonobuoy"]')
+
 # # Install `kubectl` CLI
 curl -fsLo /tmp/kubectl "https://dl.k8s.io/release/$(curl -fsL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
 sudo install -o root -g root -m 0755 /tmp/kubectl /usr/local/bin/kubectl
@@ -193,7 +208,7 @@ helm upgrade cert-manager cert-manager \
 	--namespace cert-manager \
 	--create-namespace \
 	--repo https://charts.jetstack.io \
-	--version v1.12.3 \
+	--version $CERT_MANAGER \
 	--set installCRDs=true \
 	--wait \
 	--timeout 10m
@@ -202,54 +217,67 @@ helm upgrade cert-manager cert-manager \
 		exit
 	}
 
-# Install clusterctl 
-curl -L https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.5.1/clusterctl-linux-amd64 -o clusterctl
+# Install clusterctl
+curl -L https://github.com/kubernetes-sigs/cluster-api/releases/download/$CLUSTER_API/clusterctl-linux-amd64 -o clusterctl
 sudo install -o root -g root -m 0755 clusterctl /usr/local/bin/clusterctl
 
 # Install Cluster API resources
 # using the matching tested values here:
 # https://github.com/stackhpc/capi-helm-charts/blob/main/dependencies.json
 clusterctl init \
-    --core cluster-api:v1.5.1 \
-    --bootstrap kubeadm:v1.5.1 \
-    --control-plane kubeadm:v1.5.1 \
-    --infrastructure openstack:v0.7.3
+    --core cluster-api:$CLUSTER_API \
+    --bootstrap kubeadm:$CLUSTER_API \
+    --control-plane kubeadm:$CLUSTER_API \
+    --infrastructure openstack:$CLUSTER_API_PROVIDER_OPENSTACK
 
 # Install addon manager
 helm upgrade cluster-api-addon-provider cluster-api-addon-provider \
 --install \
 --repo https://stackhpc.github.io/cluster-api-addon-provider \
---version 0.1.0 \
+--version $ADDON_PROVIDER \
 --namespace capi-addon-system \
 --create-namespace \
 --wait \
 --timeout 10m
 
 # Create a Flavor
-source /opt/stack/openrc admin admin
-
-openstack flavor create ds2G20 --ram 2048 --disk 20 --id d5 --vcpus 2 --public
 
 pip install python-magnumclient
 
-# Add a k8s image
-curl -fo ubuntu-focal-kube-v1.27.5-230831-1149.qcow2 'https://object.arcus.openstack.hpc.cam.ac.uk/azimuth-images/ubuntu-focal-kube-v1.27.5-230831-1149.qcow2?AWSAccessKeyId=c5bd0fa15bae4e08b305a52aac97c3a6&Expires=1725019728&Signature=1ZO1YVg70K1obu%2FGZHfylG3oX7U%3D'
-openstack image create ubuntu-focal-kube-v1.27.5 \
-  --file ubuntu-focal-kube-v1.27.5-230831-1149.qcow2 \
-  --disk-format qcow2 \
-  --container-format bare \
-  --public
-openstack image set ubuntu-focal-kube-v1.27.5 --os-distro ubuntu --os-version 20.04
-openstack image set ubuntu-focal-kube-v1.27.5 --property kube_version=v1.27.5
+# Curl the manifest
+AZIMUTH_IMAGES=$(curl -fsL "https://github.com/stackhpc/azimuth-images/releases/download/$AZIMUTH_IMAGES_TAG/manifest.json")
 
-curl -fo ubuntu-focal-kube-v1.28.1-230831-1150.qcow2 'https://object.arcus.openstack.hpc.cam.ac.uk/azimuth-images/ubuntu-focal-kube-v1.28.1-230831-1150.qcow2?AWSAccessKeyId=c5bd0fa15bae4e08b305a52aac97c3a6&Expires=1725019898&Signature=%2FXW2ywkA%2FQ8bCUiJkiLCWBAf81M%3D'
-openstack image create ubuntu-focal-kube-v1.28.1 \
-  --file ubuntu-focal-kube-v1.28.1-230831-1150.qcow2  \
-  --disk-format qcow2 \
-  --container-format bare \
-  --public
-openstack image set ubuntu-focal-kube-v1.28.1 --os-distro ubuntu --os-version 20.04
-openstack image set ubuntu-focal-kube-v1.28.1 --property kube_version=v1.28.1
+# Kubernetes 1.27 image
+K8S_1_27_NAME=$(echo "$AZIMUTH_IMAGES" | jq -r '.["kubernetes-1-27-jammy"].name')
+K8S_1_27_URL=$(echo "$AZIMUTH_IMAGES" | jq -r '.["kubernetes-1-27-jammy"].url')
+K8S_1_27_VERSION=$(echo "$AZIMUTH_IMAGES" | jq -r '.["kubernetes-1-27-jammy"].kubernetes_version')
+
+curl -o "$K8S_1_27_NAME.qcow2" "$K8S_1_27_URL"
+
+openstack image create "$K8S_1_27_NAME" \
+--file "$K8S_1_27_NAME.qcow2" \
+--disk-format qcow2 \
+--container-format bare \
+--public
+
+openstack image set "$K8S_1_27_NAME" --os-distro ubuntu --os-version 22.04
+openstack image set "$K8S_1_27_NAME" --property kube_version="$K8S_1_27_VERSION"
+
+# Kubernetes 1.28 image
+K8S_1_28_NAME=$(echo "$AZIMUTH_IMAGES" | jq -r '.["kubernetes-1-28-jammy"].name')
+K8S_1_28_URL=$(echo "$AZIMUTH_IMAGES" | jq -r '.["kubernetes-1-28-jammy"].url')
+K8S_1_28_VERSION=$(echo "$AZIMUTH_IMAGES" | jq -r '.["kubernetes-1-28-jammy"].kubernetes_version')
+
+curl -o "$K8S_1_28_NAME.qcow2" "$K8S_1_28_URL"
+
+openstack image create "$K8S_1_28_NAME" \
+--file "$K8S_1_28_NAME.qcow2" \
+--disk-format qcow2 \
+--container-format bare \
+--public
+
+openstack image set "$K8S_1_28_NAME" --os-distro ubuntu --os-version 22.04
+openstack image set "$K8S_1_28_NAME" --property kube_version="$K8S_1_28_VERSION"
 
 #
 # Install this checkout and restart the Magnum services
@@ -269,26 +297,40 @@ if [[ ":$PATH:" != *":$new_path:"* ]]; then
   echo 'export PATH="$PATH:'"$new_path"'"' >> ~/.bashrc
 fi
 
-# Register template for cluster api driver
-openstack coe cluster template create new_driver \
-  --coe kubernetes \
-  --label octavia_provider=ovn \
-  --image $(openstack image show ubuntu-focal-kube-v1.27.5 -c id -f value) \
-  --external-network public \
-  --master-flavor ds2G20 \
-  --flavor ds2G20 \
-  --public \
-  --master-lb-enabled
+# Kubernetes 1.27 template
+K8S_1_27_IMAGE_ID=$(openstack image show $K8S_1_27_NAME -c id -f value)
 
-openstack coe cluster template create new_driver_upgrade \
-  --coe kubernetes \
-  --label octavia_provider=ovn \
-  --image $(openstack image show ubuntu-focal-kube-v1.28.1 -c id -f value) \
-  --external-network public \
-  --master-flavor ds2G20 \
-  --flavor ds2G20 \
-  --public \
-  --master-lb-enabled
+# Kubernetes 1.27 template
+openstack coe cluster template create k8s-1-27-template \
+--coe kubernetes \
+--image "$K8S_1_27_IMAGE_ID" \
+--labels \
+capi_helm_chart_version="$LATEST_TAG",\
+octavia_provider=ovn,\
+monitoring_enabled=True,\
+kube_dashboard_enabled=True \
+--external-network public \
+--master-flavor ds2G20 \
+--flavor ds2G20 \
+--public \
+--master-lb-enabled
+
+# Kubernetes 1.28 template
+K8S_1_28_IMAGE_ID=$(openstack image show $K8S_1_28_NAME -c id -f value)
+
+openstack coe cluster template create k8s-1-28-template \
+--coe kubernetes \
+--image "$K8S_1_28_IMAGE_ID" \
+--labels \
+capi_helm_chart_version="$LATEST_TAG",\
+octavia_provider=ovn,\
+monitoring_enabled=True,\
+kube_dashboard_enabled=True \
+--external-network public \
+--master-flavor ds2G20 \
+--flavor ds2G20 \
+--public \
+--master-lb-enabled
 
 # You can test it like this:
 #  openstack coe cluster create devstacktest \
