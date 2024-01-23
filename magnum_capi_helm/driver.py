@@ -70,6 +70,17 @@ class Driver(driver.Driver):
             },
         ]
 
+    @property
+    def supported_master_sizes(self):
+        # CAPI supports control plane resizes to low uneven numbers.
+        return [1, 3, 5, 7]
+
+    def validate_master_resize(self, node_count):
+        if node_count not in self.supported_master_sizes:
+            raise exception.MasterNGResizeSizeNotSupported(
+                requested_size=node_count,
+                supported_sizes=self.supported_master_sizes)
+
     def _update_control_plane_nodegroup_status(self, cluster, nodegroup):
         # The status of the master nodegroup is determined by the Cluster API
         # control plane object
