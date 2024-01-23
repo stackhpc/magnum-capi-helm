@@ -294,8 +294,8 @@ for K8S_IMAGE_KEY in $K8S_IMAGE_KEYS; do
       --labels \
 capi_helm_chart_version="$LATEST_TAG",\
 octavia_provider=ovn,\
-monitoring_enabled=True,\
-kube_dashboard_enabled=True \
+monitoring_enabled=true,\
+kube_dashboard_enabled=true \
       --external-network public \
       --master-flavor ds2G20 \
       --flavor ds2G20 \

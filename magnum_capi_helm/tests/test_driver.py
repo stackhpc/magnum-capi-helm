@@ -1159,6 +1159,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
                 },
                 "dnsNameservers": ["8.8.1.1"],
             },
+            "etcd": {},
             "apiServer": {
                 "enableLoadBalancer": True,
                 "loadBalancerProvider": "amphora",
