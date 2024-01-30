@@ -1159,6 +1159,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
                 },
                 "dnsNameservers": ["8.8.1.1"],
             },
+            "etcd": {},
             "apiServer": {
                 "enableLoadBalancer": True,
                 "loadBalancerProvider": "amphora",
@@ -1563,6 +1564,195 @@ class ClusterAPIDriverTest(base.DbTestCase):
             version=CONF.capi_helm.default_helm_chart_version,
             namespace="magnum-fakeproject",
         )
+        helm_install_values = mock_install.call_args[0][3]
+        self.assertDictEqual(helm_install_values, expected_values)
+
+        mock_client.ensure_namespace.assert_called_once_with(
+            "magnum-fakeproject"
+        )
+        mock_appcred.assert_called_once_with(
+            self.driver, self.context, self.cluster_obj
+        )
+        mock_certs.assert_called_once_with(
+            self.driver, self.context, self.cluster_obj
+        )
+
+    @mock.patch.object(driver.Driver, "_validate_allowed_flavor")
+    @mock.patch.object(
+        driver.Driver, "_ensure_certificate_secrets", autospec=True
+    )
+    @mock.patch.object(driver.Driver, "_create_appcred_secret", autospec=True)
+    @mock.patch.object(kubernetes.Client, "load", autospec=True)
+    @mock.patch.object(driver.Driver, "_get_image_details", autospec=True)
+    @mock.patch.object(helm.Client, "install_or_upgrade", autospec=True)
+    def test_create_cluster_etcd_block_device(
+        self,
+        mock_install,
+        mock_image,
+        mock_load,
+        mock_appcred,
+        mock_certs,
+        mock_validate_allowed_flavor,
+    ):
+        mock_image.return_value = ("imageid1", "1.27.4", "ubuntu")
+        mock_client = mock.MagicMock(spec=kubernetes.Client)
+        mock_load.return_value = mock_client
+
+        self.cluster_obj.cluster_template.labels.update(
+            {
+                "etcd_blockdevice_size": "10",
+                "etcd_blockdevice_volume_type": "nvme",
+            }
+        )
+
+        self.driver.create_cluster(self.context, self.cluster_obj, 10)
+
+        # Get standard values and modify them to match this test
+        expected_values = self._get_cluster_helm_standard_values()
+        expected_values["etcd"] = {
+            "blockDevice": {
+                "size": 10,
+                "type": "Volume",
+                "volumeType": "nvme",
+            }
+        }
+
+        mock_install.assert_called_once_with(
+            self.driver._helm_client,
+            "cluster-example-a-111111111111",
+            "openstack-cluster",
+            mock.ANY,
+            repo=CONF.capi_helm.helm_chart_repo,
+            version=CONF.capi_helm.default_helm_chart_version,
+            namespace="magnum-fakeproject",
+        )
+
+        helm_install_values = mock_install.call_args[0][3]
+        self.assertDictEqual(helm_install_values, expected_values)
+
+        mock_client.ensure_namespace.assert_called_once_with(
+            "magnum-fakeproject"
+        )
+        mock_appcred.assert_called_once_with(
+            self.driver, self.context, self.cluster_obj
+        )
+        mock_certs.assert_called_once_with(
+            self.driver, self.context, self.cluster_obj
+        )
+
+    @mock.patch.object(driver.Driver, "_validate_allowed_flavor")
+    @mock.patch.object(
+        driver.Driver, "_ensure_certificate_secrets", autospec=True
+    )
+    @mock.patch.object(driver.Driver, "_create_appcred_secret", autospec=True)
+    @mock.patch.object(kubernetes.Client, "load", autospec=True)
+    @mock.patch.object(driver.Driver, "_get_image_details", autospec=True)
+    @mock.patch.object(helm.Client, "install_or_upgrade", autospec=True)
+    def test_create_cluster_etcd_block_device_local(
+        self,
+        mock_install,
+        mock_image,
+        mock_load,
+        mock_appcred,
+        mock_certs,
+        mock_validate_allowed_flavor,
+    ):
+        mock_image.return_value = ("imageid1", "1.27.4", "ubuntu")
+        mock_client = mock.MagicMock(spec=kubernetes.Client)
+        mock_load.return_value = mock_client
+
+        self.cluster_obj.cluster_template.labels.update(
+            {
+                "etcd_blockdevice_size": "10",
+                "etcd_blockdevice_type": "local",
+            }
+        )
+
+        self.driver.create_cluster(self.context, self.cluster_obj, 10)
+
+        # Get standard values and modify them to match this test
+        expected_values = self._get_cluster_helm_standard_values()
+        expected_values["etcd"] = {
+            "blockDevice": {
+                "size": 10,
+                "type": "Local",
+            }
+        }
+
+        mock_install.assert_called_once_with(
+            self.driver._helm_client,
+            "cluster-example-a-111111111111",
+            "openstack-cluster",
+            mock.ANY,
+            repo=CONF.capi_helm.helm_chart_repo,
+            version=CONF.capi_helm.default_helm_chart_version,
+            namespace="magnum-fakeproject",
+        )
+
+        helm_install_values = mock_install.call_args[0][3]
+        self.assertDictEqual(helm_install_values, expected_values)
+
+        mock_client.ensure_namespace.assert_called_once_with(
+            "magnum-fakeproject"
+        )
+        mock_appcred.assert_called_once_with(
+            self.driver, self.context, self.cluster_obj
+        )
+        mock_certs.assert_called_once_with(
+            self.driver, self.context, self.cluster_obj
+        )
+
+    @mock.patch.object(driver.Driver, "_validate_allowed_flavor")
+    @mock.patch.object(
+        driver.Driver, "_ensure_certificate_secrets", autospec=True
+    )
+    @mock.patch.object(driver.Driver, "_create_appcred_secret", autospec=True)
+    @mock.patch.object(kubernetes.Client, "load", autospec=True)
+    @mock.patch.object(driver.Driver, "_get_image_details", autospec=True)
+    @mock.patch.object(helm.Client, "install_or_upgrade", autospec=True)
+    def test_create_cluster_etcd_block_device_legacy_labels(
+        self,
+        mock_install,
+        mock_image,
+        mock_load,
+        mock_appcred,
+        mock_certs,
+        mock_validate_allowed_flavor,
+    ):
+        mock_image.return_value = ("imageid1", "1.27.4", "ubuntu")
+        mock_client = mock.MagicMock(spec=kubernetes.Client)
+        mock_load.return_value = mock_client
+
+        # Test the legacy labels for etcd volume size
+        self.cluster_obj.cluster_template.labels.update(
+            {
+                "etcd_volume_size": "10",
+                "etcd_volume_type": "nvme",
+            }
+        )
+
+        self.driver.create_cluster(self.context, self.cluster_obj, 10)
+
+        # Get standard values and modify them to match this test
+        expected_values = self._get_cluster_helm_standard_values()
+        expected_values["etcd"] = {
+            "blockDevice": {
+                "size": 10,
+                "type": "Volume",
+                "volumeType": "nvme",
+            }
+        }
+
+        mock_install.assert_called_once_with(
+            self.driver._helm_client,
+            "cluster-example-a-111111111111",
+            "openstack-cluster",
+            mock.ANY,
+            repo=CONF.capi_helm.helm_chart_repo,
+            version=CONF.capi_helm.default_helm_chart_version,
+            namespace="magnum-fakeproject",
+        )
+
         helm_install_values = mock_install.call_args[0][3]
         self.assertDictEqual(helm_install_values, expected_values)
 

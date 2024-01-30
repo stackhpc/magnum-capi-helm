@@ -476,6 +476,15 @@ class Driver(driver.Driver):
         # Default is False, so only "true" responds with True
         return cluster_label == "true"
 
+    def _get_label_int(self, cluster, label, default):
+        cluster_label = self._label(cluster, label, "")
+        if not cluster_label:
+            return default
+        try:
+            return int(cluster_label)
+        except ValueError:
+            return default
+
     def _get_chart_version(self, cluster):
         version = cluster.cluster_template.labels.get(
             "capi_helm_chart_version",
@@ -518,6 +527,42 @@ class Driver(driver.Driver):
 
     def _get_app_cred_name(self, cluster):
         return driver_utils.get_k8s_resource_name(cluster, "cloud-credentials")
+
+    def _get_etcd_config(self, cluster):
+        # Support new-style and legacy labels for volume size and type, with
+        # new-style labels taking precedence
+        etcd_size = self._get_label_int(
+            cluster,
+            "etcd_blockdevice_size",
+            self._get_label_int(cluster, "etcd_volume_size", 0),
+        )
+        if etcd_size > 0:
+            etcd_block_device = {"size": etcd_size}
+            # The block device type can be either local or volume
+            etcd_bd_type = self._label(
+                cluster, "etcd_blockdevice_type", "volume"
+            )
+            if etcd_bd_type == "local":
+                etcd_block_device["type"] = "Local"
+            else:
+                etcd_block_device["type"] = "Volume"
+
+                etcd_volume_type = self._label(
+                    cluster,
+                    "etcd_blockdevice_volume_type",
+                    self._label(cluster, "etcd_volume_type", ""),
+                )
+                if etcd_volume_type:
+                    etcd_block_device["volumeType"] = etcd_volume_type
+
+                etcd_volume_az = self._label(
+                    cluster, "etcd_blockdevice_volume_az", ""
+                )
+                if etcd_volume_az:
+                    etcd_block_device["availabilityZone"] = etcd_volume_az
+            return {"blockDevice": etcd_block_device}
+        else:
+            return {}
 
     def _get_dns_nameservers(self, cluster):
         dns_nameserver = cluster.cluster_template.dns_nameserver
@@ -593,6 +638,7 @@ class Driver(driver.Driver):
             "machineImageId": image_id,
             "machineSSHKeyName": cluster.keypair or None,
             "cloudCredentialsSecretName": self._get_app_cred_name(cluster),
+            "etcd": self._get_etcd_config(cluster),
             "apiServer": {
                 "enableLoadBalancer": True,
                 "loadBalancerProvider": self._label(
