@@ -633,6 +633,83 @@ class Driver(driver.Driver):
             f"Minimum {CONF.capi_helm.minimum_flavor_ram} MB required."
         )
 
+    def _get_csi_cinder_reclaim_policy(self, cluster):
+        return self._label(
+            cluster,
+            "csi_cinder_reclaim_policy",
+            CONF.capi_helm.csi_cinder_reclaim_policy,
+        )
+
+    def _get_csi_cinder_fstype(self, cluster):
+        return self._label(
+            cluster,
+            "csi_cinder_fstype",
+            CONF.capi_helm.csi_cinder_fstype,
+        )
+
+    def _get_csi_cinder_allow_volume_expansion(self, cluster):
+        return self._get_label_bool(
+            cluster,
+            "csi_cinder_allow_volume_expansion",
+            CONF.capi_helm.csi_cinder_allow_volume_expansion,
+        )
+
+    def _storageclass_definitions(self, context, cluster):
+        """Query cinder API to retrieve list of available volume types.
+
+        @return dict(dict,list(dict)) containing storage classes
+        """
+        LOG.debug("Retrieve volume types from cinder for StorageClasses.")
+        client = clients.OpenStackClients(context)
+        region_name = client.cinder_region_name()
+        c_client = client.cinder()
+        volume_types = [i.name for i in c_client.volume_types.list()]
+        # Use the default volume type if defined. Otherwise use the first
+        # type returned by cinder.
+        default_volume_type = CONF.capi_helm.csi_cinder_default_volume_type
+        LOG.debug(
+            f"Default volume type: {default_volume_type}"
+            f" Volume types: {volume_types}"
+        )
+        if not default_volume_type:
+            default_volume_type = volume_types[0]
+            LOG.warning(
+                f"Default volume type not defined."
+                f" Using {default_volume_type}."
+            )
+        elif default_volume_type not in volume_types:
+            # If default does not exist throw an error.
+            raise exception.MagnumException(
+                message=f"{default_volume_type} is not a"
+                " valid Cinder volume type."
+            )
+        default_storage_class = {}
+        additional_storage_classes = []
+        allow_expansion = self._get_csi_cinder_allow_volume_expansion(cluster)
+        reclaim_policy = self._get_csi_cinder_reclaim_policy(cluster)
+        allowed_topologies = CONF.capi_helm.csi_cinder_allowed_topologies
+        fstype = self._get_csi_cinder_fstype(cluster)
+
+        for volume_type in volume_types:
+            storage_class = {
+                "name": volume_type,
+                "reclaimPolicy": reclaim_policy,
+                "allowVolumeExpansion": allow_expansion,
+                "availabilityZone": region_name,
+                "volumeType": volume_type,
+                "allowedTopologies": allowed_topologies,
+                "fstype": fstype,
+                "enabled": True,
+            }
+            if volume_type == default_volume_type:
+                default_storage_class = storage_class
+            else:
+                additional_storage_classes.append(storage_class)
+        return dict(
+            defaultStorageClass=default_storage_class,
+            additionalStorageClasses=additional_storage_classes,
+        )
+
     def _update_helm_release(self, context, cluster, nodegroups=None):
         if nodegroups is None:
             nodegroups = cluster.nodegroups
@@ -695,6 +772,11 @@ class Driver(driver.Driver):
                 if ng.role != NODE_GROUP_ROLE_CONTROLLER
             ],
             "addons": {
+                "openstack": {
+                    "csiCinder": self._storageclass_definitions(
+                        context, cluster
+                    )
+                },
                 "monitoring": {
                     "enabled": self._get_monitoring_enabled(cluster)
                 },
