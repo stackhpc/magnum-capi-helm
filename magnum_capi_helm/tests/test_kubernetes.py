@@ -90,9 +90,9 @@ class TestKubernetesClient(base.TestCase):
 
         # Set -data in base64 to create tmp files.
         del kubeconfig["users"][0]["user"]["client-certificate"]
-        kubeconfig["users"][0]["user"][
-            "client-certificate-data"
-        ] = base64.b64encode(b"client cert data").decode("utf-8")
+        kubeconfig["users"][0]["user"]["client-certificate-data"] = (
+            base64.b64encode(b"client cert data").decode("utf-8")
+        )
 
         client = kubernetes.Client(kubeconfig)
 
