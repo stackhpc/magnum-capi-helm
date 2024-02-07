@@ -1190,6 +1190,9 @@ class ClusterAPIDriverTest(base.DbTestCase):
         }
 
     @mock.patch.object(
+        driver.Driver, "_get_k8s_keystone_auth_enabled", return_value=False
+    )
+    @mock.patch.object(
         driver.Driver,
         "_storageclass_definitions",
         return_value=mock.ANY,
@@ -1213,6 +1216,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_get_net,
         mock_validate_allowed_flavor,
         mock_storageclasses,
+        mock_get_keystone_auth_enabled,
     ):
         mock_image.return_value = (
             "imageid1",
@@ -1254,6 +1258,9 @@ class ClusterAPIDriverTest(base.DbTestCase):
         self.assertEqual([], mock_get_net.call_args_list)
 
     @mock.patch.object(
+        driver.Driver, "_get_k8s_keystone_auth_enabled", return_value=False
+    )
+    @mock.patch.object(
         driver.Driver,
         "_storageclass_definitions",
         return_value=mock.ANY,
@@ -1275,6 +1282,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_certs,
         mock_validate_allowed_flavor,
         mock_storageclasses,
+        mock_get_keystone_auth_enabled,
     ):
         mock_image.return_value = ("imageid1", "1.27.4", "ubuntu")
         mock_client = mock.MagicMock(spec=kubernetes.Client)
@@ -1311,6 +1319,9 @@ class ClusterAPIDriverTest(base.DbTestCase):
         )
 
     @mock.patch.object(
+        driver.Driver, "_get_k8s_keystone_auth_enabled", return_value=False
+    )
+    @mock.patch.object(
         driver.Driver,
         "_storageclass_definitions",
         return_value=mock.ANY,
@@ -1332,6 +1343,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_certs,
         mock_validate_allowed_flavor,
         mock_storageclasses,
+        mock_get_keystone_auth_enabled,
     ):
         mock_image.return_value = ("imageid1", "1.27.4", "ubuntu")
         mock_client = mock.MagicMock(spec=kubernetes.Client)
@@ -1377,6 +1389,9 @@ class ClusterAPIDriverTest(base.DbTestCase):
         )
 
     @mock.patch.object(
+        driver.Driver, "_get_k8s_keystone_auth_enabled", return_value=False
+    )
+    @mock.patch.object(
         driver.Driver,
         "_storageclass_definitions",
         return_value=mock.ANY,
@@ -1398,6 +1413,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_certs,
         mock_validate_allowed_flavor,
         mock_storageclasses,
+        mock_get_keystone_auth_enabled,
     ):
         mock_image.return_value = (
             "imageid1",
@@ -1459,6 +1475,9 @@ class ClusterAPIDriverTest(base.DbTestCase):
         )
 
     @mock.patch.object(
+        driver.Driver, "_get_k8s_keystone_auth_enabled", return_value=False
+    )
+    @mock.patch.object(
         driver.Driver,
         "_storageclass_definitions",
         return_value=mock.ANY,
@@ -1478,6 +1497,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_certs,
         mock_validate_allowed_flavor,
         mock_storageclasses,
+        mock_get_keystone_auth_enabled,
     ):
         mock_image.return_value = (
             "imageid1",
@@ -1512,6 +1532,9 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_certs.assert_called_once_with(self.context, self.cluster_obj)
 
     @mock.patch.object(
+        driver.Driver, "_get_k8s_keystone_auth_enabled", return_value=False
+    )
+    @mock.patch.object(
         driver.Driver,
         "_storageclass_definitions",
         return_value=mock.ANY,
@@ -1531,6 +1554,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_certs,
         mock_validate_allowed_flavor,
         mock_storageclasses,
+        mock_get_keystone_auth_enabled,
     ):
         mock_image.return_value = (
             "imageid1",
@@ -1561,6 +1585,9 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_certs.assert_called_once_with(self.context, self.cluster_obj)
 
     @mock.patch.object(
+        driver.Driver, "_get_k8s_keystone_auth_enabled", return_value=False
+    )
+    @mock.patch.object(
         driver.Driver,
         "_storageclass_definitions",
         return_value=mock.ANY,
@@ -1582,6 +1609,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_certs,
         mock_validate_allowed_flavor,
         mock_storageclasses,
+        mock_get_keystone_auth_enabled,
     ):
         mock_image.return_value = ("imageid1", "1.27.4", "ubuntu")
         mock_client = mock.MagicMock(spec=kubernetes.Client)
@@ -1621,6 +1649,9 @@ class ClusterAPIDriverTest(base.DbTestCase):
         )
 
     @mock.patch.object(
+        driver.Driver, "_get_k8s_keystone_auth_enabled", return_value=False
+    )
+    @mock.patch.object(
         driver.Driver,
         "_storageclass_definitions",
         return_value=mock.ANY,
@@ -1642,6 +1673,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_certs,
         mock_validate_allowed_flavor,
         mock_storageclasses,
+        mock_get_keystone_auth_enabled,
     ):
         mock_image.return_value = ("imageid1", "1.27.4", "ubuntu")
         mock_client = mock.MagicMock(spec=kubernetes.Client)
@@ -1690,6 +1722,9 @@ class ClusterAPIDriverTest(base.DbTestCase):
         )
 
     @mock.patch.object(
+        driver.Driver, "_get_k8s_keystone_auth_enabled", return_value=False
+    )
+    @mock.patch.object(
         driver.Driver,
         "_storageclass_definitions",
         return_value=mock.ANY,
@@ -1711,6 +1746,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_certs,
         mock_validate_allowed_flavor,
         mock_storageclasses,
+        mock_get_keystone_auth_enabled,
     ):
         mock_image.return_value = ("imageid1", "1.27.4", "ubuntu")
         mock_client = mock.MagicMock(spec=kubernetes.Client)
@@ -1758,6 +1794,9 @@ class ClusterAPIDriverTest(base.DbTestCase):
         )
 
     @mock.patch.object(
+        driver.Driver, "_get_k8s_keystone_auth_enabled", return_value=False
+    )
+    @mock.patch.object(
         driver.Driver,
         "_storageclass_definitions",
         return_value=mock.ANY,
@@ -1779,6 +1818,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_certs,
         mock_validate_allowed_flavor,
         mock_storageclasses,
+        mock_get_keystone_auth_enabled,
     ):
         mock_image.return_value = ("imageid1", "1.27.4", "ubuntu")
         mock_client = mock.MagicMock(spec=kubernetes.Client)
