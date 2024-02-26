@@ -1189,6 +1189,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
             "machineSSHKeyName": None,
         }
 
+    @mock.patch.object(driver.Driver, "_get_allowed_cidrs")
     @mock.patch.object(
         driver.Driver, "_get_k8s_keystone_auth_enabled", return_value=False
     )
@@ -1217,6 +1218,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_validate_allowed_flavor,
         mock_storageclasses,
         mock_get_keystone_auth_enabled,
+        mock_get_allowed_cidrs,
     ):
         mock_image.return_value = (
             "imageid1",
@@ -1257,6 +1259,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         )
         self.assertEqual([], mock_get_net.call_args_list)
 
+    @mock.patch.object(driver.Driver, "_get_allowed_cidrs")
     @mock.patch.object(
         driver.Driver, "_get_k8s_keystone_auth_enabled", return_value=False
     )
@@ -1283,6 +1286,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_validate_allowed_flavor,
         mock_storageclasses,
         mock_get_keystone_auth_enabled,
+        mock_get_allowed_cidrs,
     ):
         mock_image.return_value = ("imageid1", "1.27.4", "ubuntu")
         mock_client = mock.MagicMock(spec=kubernetes.Client)
@@ -1318,6 +1322,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
             self.driver, self.context, self.cluster_obj
         )
 
+    @mock.patch.object(driver.Driver, "_get_allowed_cidrs")
     @mock.patch.object(
         driver.Driver, "_get_k8s_keystone_auth_enabled", return_value=False
     )
@@ -1344,6 +1349,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_validate_allowed_flavor,
         mock_storageclasses,
         mock_get_keystone_auth_enabled,
+        mock_get_allowed_cidrs,
     ):
         mock_image.return_value = ("imageid1", "1.27.4", "ubuntu")
         mock_client = mock.MagicMock(spec=kubernetes.Client)
@@ -1388,6 +1394,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
             self.driver, self.context, self.cluster_obj
         )
 
+    @mock.patch.object(driver.Driver, "_get_allowed_cidrs")
     @mock.patch.object(
         driver.Driver, "_get_k8s_keystone_auth_enabled", return_value=False
     )
@@ -1414,6 +1421,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_validate_allowed_flavor,
         mock_storageclasses,
         mock_get_keystone_auth_enabled,
+        mock_get_allowed_cidrs,
     ):
         mock_image.return_value = (
             "imageid1",
@@ -1474,6 +1482,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
             self.driver, self.context, self.cluster_obj
         )
 
+    @mock.patch.object(driver.Driver, "_get_allowed_cidrs")
     @mock.patch.object(
         driver.Driver, "_get_k8s_keystone_auth_enabled", return_value=False
     )
@@ -1498,6 +1507,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_validate_allowed_flavor,
         mock_storageclasses,
         mock_get_keystone_auth_enabled,
+        mock_get_allowed_cidrs,
     ):
         mock_image.return_value = (
             "imageid1",
@@ -1531,6 +1541,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_appcred.assert_called_once_with(self.context, self.cluster_obj)
         mock_certs.assert_called_once_with(self.context, self.cluster_obj)
 
+    @mock.patch.object(driver.Driver, "_get_allowed_cidrs")
     @mock.patch.object(
         driver.Driver, "_get_k8s_keystone_auth_enabled", return_value=False
     )
@@ -1555,6 +1566,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_validate_allowed_flavor,
         mock_storageclasses,
         mock_get_keystone_auth_enabled,
+        mock_get_allowed_cidrs,
     ):
         mock_image.return_value = (
             "imageid1",
@@ -1584,6 +1596,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_appcred.assert_called_once_with(self.context, self.cluster_obj)
         mock_certs.assert_called_once_with(self.context, self.cluster_obj)
 
+    @mock.patch.object(driver.Driver, "_get_allowed_cidrs")
     @mock.patch.object(
         driver.Driver, "_get_k8s_keystone_auth_enabled", return_value=False
     )
@@ -1610,6 +1623,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_validate_allowed_flavor,
         mock_storageclasses,
         mock_get_keystone_auth_enabled,
+        mock_get_allowed_cidrs,
     ):
         mock_image.return_value = ("imageid1", "1.27.4", "ubuntu")
         mock_client = mock.MagicMock(spec=kubernetes.Client)
@@ -1648,6 +1662,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
             self.driver, self.context, self.cluster_obj
         )
 
+    @mock.patch.object(driver.Driver, "_get_allowed_cidrs")
     @mock.patch.object(
         driver.Driver, "_get_k8s_keystone_auth_enabled", return_value=False
     )
@@ -1674,6 +1689,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_validate_allowed_flavor,
         mock_storageclasses,
         mock_get_keystone_auth_enabled,
+        mock_get_allowed_cidrs,
     ):
         mock_image.return_value = ("imageid1", "1.27.4", "ubuntu")
         mock_client = mock.MagicMock(spec=kubernetes.Client)
@@ -1721,6 +1737,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
             self.driver, self.context, self.cluster_obj
         )
 
+    @mock.patch.object(driver.Driver, "_get_allowed_cidrs")
     @mock.patch.object(
         driver.Driver, "_get_k8s_keystone_auth_enabled", return_value=False
     )
@@ -1747,6 +1764,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_validate_allowed_flavor,
         mock_storageclasses,
         mock_get_keystone_auth_enabled,
+        mock_get_allowed_cidrs,
     ):
         mock_image.return_value = ("imageid1", "1.27.4", "ubuntu")
         mock_client = mock.MagicMock(spec=kubernetes.Client)
@@ -1793,6 +1811,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
             self.driver, self.context, self.cluster_obj
         )
 
+    @mock.patch.object(driver.Driver, "_get_allowed_cidrs")
     @mock.patch.object(
         driver.Driver, "_get_k8s_keystone_auth_enabled", return_value=False
     )
@@ -1819,6 +1838,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_validate_allowed_flavor,
         mock_storageclasses,
         mock_get_keystone_auth_enabled,
+        mock_get_allowed_cidrs,
     ):
         mock_image.return_value = ("imageid1", "1.27.4", "ubuntu")
         mock_client = mock.MagicMock(spec=kubernetes.Client)
@@ -2322,4 +2342,50 @@ class ClusterAPIDriverTest(base.DbTestCase):
             mock_template,
             1,
             node_group,
+        )
+
+    @mock.patch.object(
+        driver.Driver, "_get_k8s_keystone_auth_enabled", return_value=False
+    )
+    @mock.patch.object(
+        driver.Driver,
+        "_storageclass_definitions",
+        return_value=mock.ANY,
+    )
+    @mock.patch.object(driver.Driver, "_validate_allowed_flavor")
+    @mock.patch.object(neutron, "get_network", autospec=True)
+    @mock.patch.object(
+        driver.Driver, "_ensure_certificate_secrets", autospec=True
+    )
+    @mock.patch.object(driver.Driver, "_create_appcred_secret", autospec=True)
+    @mock.patch.object(kubernetes.Client, "load", autospec=True)
+    @mock.patch.object(driver.Driver, "_get_image_details", autospec=True)
+    @mock.patch.object(helm.Client, "install_or_upgrade", autospec=True)
+    def test_create_cluster_api_lb_allowed_cidrs(
+        self,
+        mock_install,
+        mock_image,
+        mock_load,
+        mock_appcred,
+        mock_certs,
+        mock_get_net,
+        mock_validate_allowed_flavor,
+        mock_storageclasses,
+        mock_get_keystone_auth_enabled,
+    ):
+        cidrs = "192.168.0.0/16;10.0.0.0/8;123.123.123.123/32"
+        self.cluster_obj.labels = dict(api_master_lb_allowed_cidrs=cidrs)
+        mock_image.return_value = (
+            "imageid1",
+            "1.27.4",
+            "ubuntu",
+        )
+        mock_client = mock.MagicMock(spec=kubernetes.Client)
+        mock_load.return_value = mock_client
+
+        self.driver.create_cluster(self.context, self.cluster_obj, 10)
+        cidr_list = cidrs.split(";")
+        helm_install_values = mock_install.call_args[0][3]
+        self.assertEqual(
+            helm_install_values["apiServer"]["allowedCidrs"], cidr_list
         )
