@@ -5,4 +5,4 @@
 pbr>=2.0 # Apache-2.0
 oslo_log
 oslo_utils
-magnum
+magnum==17.0.2
