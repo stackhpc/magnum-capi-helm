@@ -646,6 +646,13 @@ class Driver(driver.Driver):
             CONF.capi_helm.csi_cinder_allow_volume_expansion,
         )
 
+    def _get_allowed_cidrs(self, cluster):
+        cidr_list = cluster.labels.get("api_master_lb_allowed_cidrs", "")
+        LOG.debug(f"CIDR list {cidr_list}")
+        if isinstance(cidr_list, str) and cidr_list != "":
+            return cidr_list.split(";")
+        return False
+
     def _storageclass_definitions(self, context, cluster):
         """Query cinder API to retrieve list of available volume types.
 
@@ -840,6 +847,13 @@ class Driver(driver.Driver):
                 f" project: {context.project_id} auth url: {context.auth_url}"
             )
 
+        api_lb_allowed_cidrs = self._get_allowed_cidrs(cluster)
+        if isinstance(api_lb_allowed_cidrs, list):
+            allowed_cidrs_config = {
+                "apiServer": {"allowedCidrs": api_lb_allowed_cidrs}
+            }
+            values = helm.mergeconcat(values, allowed_cidrs_config)
+
         self._helm_client.install_or_upgrade(
             driver_utils.chart_release_name(cluster),
             CONF.capi_helm.helm_chart_name,
@@ -948,7 +962,6 @@ class Driver(driver.Driver):
         # So mark them all as having an update in progress
         for nodegroup in cluster.nodegroups:
             nodegroup.status = fields.ClusterStatus.UPDATE_IN_PROGRESS
-            print("Flavor id: %s" % nodegroup.flavor_id)
             self._validate_allowed_flavor(context, nodegroup.flavor_id)
             nodegroup.save()
 
