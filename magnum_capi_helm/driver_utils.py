@@ -33,8 +33,8 @@ def sanitized_name(name, suffix=None):
     return re.sub(
         "[^a-z0-9]+",
         "-",
-        (f"{name}-{suffix}" if suffix else name).lower().strip("-"),
-    )
+        (f"{name}-{suffix}" if suffix else name).lower(),
+    ).strip("-")
 
 
 def chart_release_name(cluster):
