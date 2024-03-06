@@ -33,7 +33,7 @@ def sanitized_name(name, suffix=None):
     return re.sub(
         "[^a-z0-9]+",
         "-",
-        (f"{name}-{suffix}" if suffix else name).lower(),
+        (f"{name}-{suffix}" if suffix else name).lower().strip("-"),
     )
 
 
