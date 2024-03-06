@@ -67,6 +67,7 @@ class TestAppCreds(base.DbTestCase):
                         "application_credential_secret": "pass",
                         "auth_url": "http://keystone",
                     },
+		    "auth_type" : "v3applicationcredential",
                     "identity_api_version": 3,
                     "interface": "public",
                     "region_name": "cinder",
