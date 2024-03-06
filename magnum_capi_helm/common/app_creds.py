@@ -73,6 +73,7 @@ def _create_app_cred(context, cluster):
                     "application_credential_id": app_cred.id,
                     "application_credential_secret": app_cred.secret,
                 },
+	       "auth_type": "v3applicationcredential",
             },
         },
     }
