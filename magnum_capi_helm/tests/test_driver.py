@@ -1114,9 +1114,9 @@ class ClusterAPIDriverTest(base.DbTestCase):
         self.assertTrue(result)
 
     def test_get_kube_dash_enabled_from_template(self):
-        self.cluster_obj.cluster_template.labels["kube_dashboard_enabled"] = (
-            "false"
-        )
+        self.cluster_obj.cluster_template.labels[
+            "kube_dashboard_enabled"
+        ] = "false"
 
         result = self.driver._get_kube_dash_enabled(self.cluster_obj)
 
@@ -1128,9 +1128,9 @@ class ClusterAPIDriverTest(base.DbTestCase):
         self.assertEqual(CONF.capi_helm.default_helm_chart_version, version)
 
     def test_get_chart_version_from_template(self):
-        self.cluster_obj.cluster_template.labels["capi_helm_chart_version"] = (
-            "1.42.0"
-        )
+        self.cluster_obj.cluster_template.labels[
+            "capi_helm_chart_version"
+        ] = "1.42.0"
 
         version = self.driver._get_chart_version(self.cluster_obj)
 
@@ -1629,9 +1629,9 @@ class ClusterAPIDriverTest(base.DbTestCase):
         mock_client = mock.MagicMock(spec=kubernetes.Client)
         mock_load.return_value = mock_client
 
-        self.cluster_obj.cluster_template.labels["auto_healing_enabled"] = (
-            "false"
-        )
+        self.cluster_obj.cluster_template.labels[
+            "auto_healing_enabled"
+        ] = "false"
 
         self.driver.create_cluster(self.context, self.cluster_obj, 10)
 
@@ -2049,7 +2049,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
             self.context, self.cluster_obj
         )
         default_storage_class = storage_classes["defaultStorageClass"]
-        volume_type = default_storage_class["volumeType"]
+        volume_type = default_storage_class["name"]
         self.assertEqual("type1", volume_type)
 
     @mock.patch.object(helm.Client, "uninstall_release")
