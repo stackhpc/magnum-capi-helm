@@ -2031,7 +2031,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
         CONF.capi_helm.csi_cinder_default_volume_type = None
         mock_osc_rn.return_value = "middle_earth_east"
         mock_vol_type_1 = mock.MagicMock()
-        mock_vol_type_1.name = "type1"
+        mock_vol_type_1.name = "__TYPE1__"
         mock_vol_type_2 = mock.MagicMock()
         mock_vol_type_2.name = "type2"
         mock_vol_type_3 = mock.MagicMock()
@@ -2049,7 +2049,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
             self.context, self.cluster_obj
         )
         default_storage_class = storage_classes["defaultStorageClass"]
-        volume_type = default_storage_class["volumeType"]
+        volume_type = default_storage_class["name"]
         self.assertEqual("type1", volume_type)
 
     @mock.patch.object(helm.Client, "uninstall_release")

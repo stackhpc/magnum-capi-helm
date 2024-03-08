@@ -691,7 +691,7 @@ class Driver(driver.Driver):
 
         for volume_type in volume_types:
             storage_class = {
-                "name": volume_type,
+                "name": driver_utils.sanitized_name(volume_type),
                 "reclaimPolicy": reclaim_policy,
                 "allowVolumeExpansion": allow_expansion,
                 "availabilityZone": region_name,
