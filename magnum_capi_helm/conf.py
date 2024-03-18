@@ -121,7 +121,7 @@ capi_helm_opts = [
         "app_cred_interface_type",
         default="public",
         help=(
-            "The value use in the interface field of "
+            "The value to use in the interface field of "
             "generated application credentials."
         ),
     ),
