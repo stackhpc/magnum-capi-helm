@@ -140,6 +140,9 @@ The driver supports the following labels:
 * fixed_subnet_cidr: default is "10.0.0.0/24"
 * extra_network_name: default is "", change to name of additional network,
   which can be useful if using Manila with the CephFS Native driver.
+* api_master_lb_allowed_cidrs: default is "" which is equivalent to 0.0.0.0/0. 
+  Provide a semicolon separated (;) list of CIDRs to restrict API load balancer access.
+  For example '123.123.123.123/32;10.0.0.0/8;192.168.3.0/24'
 
 Currently all clusters use the Calico CNI. While Cilium is also supported
 in the helm charts, it is not currently reguarlly tested.
