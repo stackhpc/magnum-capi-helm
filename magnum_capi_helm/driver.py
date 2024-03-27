@@ -472,9 +472,9 @@ class Driver(driver.Driver):
             return default
         if default:
             # Default is on, so return for any value except "false"
-            return cluster_label != "false"
+            return cluster_label.lower() != "false"
         # Default is False, so only "true" responds with True
-        return cluster_label == "true"
+        return cluster_label.lower() == "true"
 
     def _get_label_int(self, cluster, label, default):
         cluster_label = self._label(cluster, label, "")
@@ -660,7 +660,7 @@ class Driver(driver.Driver):
         """
         LOG.debug("Retrieve volume types from cinder for StorageClasses.")
         client = clients.OpenStackClients(context)
-        region_name = client.cinder_region_name()
+        availability_zone = CONF.capi_helm.csi_cinder_availability_zone
         c_client = client.cinder()
         volume_types = [i.name for i in c_client.volume_types.list()]
         # Use the default volume type if defined. Otherwise use the first
@@ -694,7 +694,7 @@ class Driver(driver.Driver):
                 "name": driver_utils.sanitized_name(volume_type),
                 "reclaimPolicy": reclaim_policy,
                 "allowVolumeExpansion": allow_expansion,
-                "availabilityZone": region_name,
+                "availabilityZone": availability_zone,
                 "volumeType": volume_type,
                 "allowedTopologies": allowed_topologies,
                 "fstype": fstype,
@@ -831,13 +831,15 @@ class Driver(driver.Driver):
         if self._get_k8s_keystone_auth_enabled(cluster):
             k8s_keystone_auth_config = {
                 "authWebhook": "k8s-keystone-auth",
-                "openstack": {
-                    "k8sKeystoneAuth": {  # addon subchart configuration
-                        "enabled": True,
-                        "values": {
-                            "openstackAuthUrl": context.auth_url,
-                            "projectId": context.project_id,
-                        },
+                "addons": {
+                    "openstack": {
+                        "k8sKeystoneAuth": {  # addon subchart configuration
+                            "enabled": True,
+                            "values": {
+                                "openstackAuthUrl": context.auth_url,
+                                "projectId": context.project_id,
+                            },
+                        }
                     }
                 },
             }
