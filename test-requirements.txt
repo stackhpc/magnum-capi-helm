@@ -12,4 +12,4 @@ testtools>=1.4.0 # MIT
 black<25.0.0
 
 # pin magnum while out of tree
-magnum==17.0.2
+magnum

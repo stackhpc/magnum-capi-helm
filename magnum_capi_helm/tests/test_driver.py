@@ -1107,20 +1107,33 @@ class ClusterAPIDriverTest(base.DbTestCase):
         self.assertTrue(self.cluster_obj.name[:30] in second)
 
     def test_get_monitoring_enabled_from_template(self):
-        self.cluster_obj.cluster_template.labels["monitoring_enabled"] = "true"
 
-        result = self.driver._get_monitoring_enabled(self.cluster_obj)
+        # Check default if label is not present
+        self.assertFalse(self.driver._get_monitoring_enabled(self.cluster_obj))
 
-        self.assertTrue(result)
+        for val in ["true", "True", "TRUE"]:
+
+            self.cluster_obj.cluster_template.labels["monitoring_enabled"] = (
+                val
+            )
+
+            result = self.driver._get_monitoring_enabled(self.cluster_obj)
+
+            self.assertTrue(result)
 
     def test_get_kube_dash_enabled_from_template(self):
-        self.cluster_obj.cluster_template.labels["kube_dashboard_enabled"] = (
-            "false"
-        )
+        # Check default if label is not present
+        self.assertTrue(self.driver._get_kube_dash_enabled(self.cluster_obj))
 
-        result = self.driver._get_kube_dash_enabled(self.cluster_obj)
+        for val in ["false", "False", "FALSE"]:
 
-        self.assertFalse(result)
+            self.cluster_obj.cluster_template.labels[
+                "kube_dashboard_enabled"
+            ] = val
+
+            result = self.driver._get_kube_dash_enabled(self.cluster_obj)
+
+            self.assertFalse(result)
 
     def test_get_chart_version_from_config(self):
         version = self.driver._get_chart_version(self.cluster_obj)
@@ -1957,11 +1970,10 @@ class ClusterAPIDriverTest(base.DbTestCase):
         )
         mock_labels.assert_called_with(self.cluster_obj)
 
-    @mock.patch("magnum.common.clients.OpenStackClients.cinder_region_name")
     @mock.patch("magnum.common.clients.OpenStackClients.cinder")
-    def test_get_storage_classes(self, mock_cinder, mock_osc_rn):
+    def test_get_storage_classes(self, mock_cinder):
         CONF.capi_helm.csi_cinder_default_volume_type = "type3"
-        mock_osc_rn.return_value = "middle_earth_east"
+        CONF.capi_helm.csi_cinder_availability_zone = "middle_earth_east"
         mock_vol_type_1 = mock.MagicMock()
         mock_vol_type_1.name = "type1"
         mock_vol_type_2 = mock.MagicMock()
@@ -1989,17 +2001,14 @@ class ClusterAPIDriverTest(base.DbTestCase):
             "type3", storage_classes["defaultStorageClass"]["volumeType"]
         )
         self.assertEqual(
-            "middle_earth_east",
+            "middleeartheast",
             storage_classes["additionalStorageClasses"][0]["availabilityZone"],
         )
 
-    @mock.patch("magnum.common.clients.OpenStackClients.cinder_region_name")
     @mock.patch("magnum.common.clients.OpenStackClients.cinder")
-    def test_get_storage_class_volume_type_not_available(
-        self, mock_cinder, mock_osc_rn
-    ):
+    def test_get_storage_class_volume_type_not_available(self, mock_cinder):
         CONF.capi_helm.csi_cinder_default_volume_type = "type4"
-        mock_osc_rn.return_value = "middle_earth_east"
+        CONF.capi_helm.csi_cinder_availability_zone = "middle_earth_east"
         mock_vol_type_1 = mock.MagicMock()
         mock_vol_type_1.name = "type1"
         mock_vol_type_2 = mock.MagicMock()
@@ -2023,13 +2032,10 @@ class ClusterAPIDriverTest(base.DbTestCase):
             self.cluster_obj,
         )
 
-    @mock.patch("magnum.common.clients.OpenStackClients.cinder_region_name")
     @mock.patch("magnum.common.clients.OpenStackClients.cinder")
-    def test_get_storage_class_volume_type_not_defined(
-        self, mock_cinder, mock_osc_rn
-    ):
+    def test_get_storage_class_volume_type_not_defined(self, mock_cinder):
         CONF.capi_helm.csi_cinder_default_volume_type = None
-        mock_osc_rn.return_value = "middle_earth_east"
+        CONF.capi_helm.csi_cinder_availability_zone = "middle_earth_east"
         mock_vol_type_1 = mock.MagicMock()
         mock_vol_type_1.name = "__TYPE1__"
         mock_vol_type_2 = mock.MagicMock()
@@ -2388,4 +2394,110 @@ class ClusterAPIDriverTest(base.DbTestCase):
         helm_install_values = mock_install.call_args[0][3]
         self.assertEqual(
             helm_install_values["apiServer"]["allowedCidrs"], cidr_list
+        )
+
+    @mock.patch.object(driver.Driver, "_get_k8s_keystone_auth_enabled")
+    @mock.patch.object(
+        driver.Driver,
+        "_storageclass_definitions",
+        return_value=mock.ANY,
+    )
+    @mock.patch.object(driver.Driver, "_validate_allowed_flavor")
+    @mock.patch.object(neutron, "get_network", autospec=True)
+    @mock.patch.object(
+        driver.Driver, "_ensure_certificate_secrets", autospec=True
+    )
+    @mock.patch.object(driver.Driver, "_create_appcred_secret", autospec=True)
+    @mock.patch.object(kubernetes.Client, "load", autospec=True)
+    @mock.patch.object(driver.Driver, "_get_image_details", autospec=True)
+    @mock.patch.object(helm.Client, "install_or_upgrade", autospec=True)
+    def test_create_cluster_keystone_webhook_enabled(
+        self,
+        mock_install,
+        mock_image,
+        mock_load,
+        mock_appcred,
+        mock_certs,
+        mock_get_net,
+        mock_validate_allowed_flavor,
+        mock_storageclasses,
+        mock_get_keystone_auth_enabled,
+    ):
+        mock_image.return_value = (
+            "imageid1",
+            "1.27.4",
+            "ubuntu",
+        )
+        mock_client = mock.MagicMock(spec=kubernetes.Client)
+        mock_load.return_value = mock_client
+        mock_get_keystone_auth_enabled.return_value = True  # Enable webhook
+        self.cluster_obj.labels = {}
+
+        self.driver.create_cluster(
+            self.context, self.cluster_obj, "timeout-not-used"
+        )
+
+        helm_install_values = mock_install.call_args[0][3]
+        self.assertEqual(
+            helm_install_values["authWebhook"], "k8s-keystone-auth"
+        )
+        self.assertTrue(
+            helm_install_values["addons"]
+            .get(
+                "openstack", {}
+            )  # Default to {} so that next .get isn't called on None type
+            .get("k8sKeystoneAuth", {})
+            .get("enabled")
+        )
+
+    @mock.patch.object(driver.Driver, "_get_k8s_keystone_auth_enabled")
+    @mock.patch.object(
+        driver.Driver,
+        "_storageclass_definitions",
+        return_value=mock.ANY,
+    )
+    @mock.patch.object(driver.Driver, "_validate_allowed_flavor")
+    @mock.patch.object(neutron, "get_network", autospec=True)
+    @mock.patch.object(
+        driver.Driver, "_ensure_certificate_secrets", autospec=True
+    )
+    @mock.patch.object(driver.Driver, "_create_appcred_secret", autospec=True)
+    @mock.patch.object(kubernetes.Client, "load", autospec=True)
+    @mock.patch.object(driver.Driver, "_get_image_details", autospec=True)
+    @mock.patch.object(helm.Client, "install_or_upgrade", autospec=True)
+    def test_create_cluster_keystone_webhook_disabled(
+        self,
+        mock_install,
+        mock_image,
+        mock_load,
+        mock_appcred,
+        mock_certs,
+        mock_get_net,
+        mock_validate_allowed_flavor,
+        mock_storageclasses,
+        mock_get_keystone_auth_enabled,
+    ):
+        mock_image.return_value = (
+            "imageid1",
+            "1.27.4",
+            "ubuntu",
+        )
+        mock_client = mock.MagicMock(spec=kubernetes.Client)
+        mock_load.return_value = mock_client
+        mock_get_keystone_auth_enabled.return_value = False  # Disable webhook
+        self.cluster_obj.labels = {}
+
+        self.driver.create_cluster(
+            self.context, self.cluster_obj, "timeout-not-used"
+        )
+
+        helm_install_values = mock_install.call_args[0][3]
+        self.assertNotEqual(
+            helm_install_values.get("authWebhook"), "k8s-keystone-auth"
+        )
+        self.assertFalse(
+            helm_install_values["addons"]
+            .get("openstack", {})
+            .get("k8sKeystoneAuth", {})
+            .get("enabled")
         )
