@@ -1,3 +1,6 @@
+This repository has been moved to `<https://opendev.org/openstack/magnum-capi-helm>`__
+######################################################################################
+
 ===============================
 magnum-capi-helm
 ===============================
