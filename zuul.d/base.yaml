@@ -1,0 +1,39 @@
+---
+- job:
+    name: magnum-capi-helm-tests-cluster
+    parent: magnum-tempest-plugin-tests-cluster-base
+    nodeset: magnum-ubuntu-noble-32GB
+    pre-run: playbooks/pre.yaml
+    post-run: playbooks/post.yaml
+    roles:
+      - zuul: openstack/devstack-plugin-container
+    vars:
+      devstack_localrc:
+        CONTAINER_ENGINE: "crio"
+        CRIO_VERSION: "1.32.1"
+        K8S_TOKEN: "0cvq6p.k454yiandj1tjxxv"
+        K8S_COPY_KUBECONFIG_PATH: "/etc/magnum/kubeconfig"
+        FIXED_RANGE: 10.1.0.0/20
+        OCTAVIA_NODE: api
+        DISABLE_AMP_IMAGE_BUILD: true
+      devstack_plugins:
+        devstack-plugin-container: https://opendev.org/openstack/devstack-plugin-container
+        magnum: https://review.opendev.org/openstack/magnum
+        magnum-capi-helm: https://opendev.org/openstack/magnum-capi-helm
+        octavia: https://opendev.org/openstack/octavia
+        ovn-octavia-provider: https://github.com/openstack/ovn-octavia-provider
+      devstack_services:
+        etcd3: true
+        container: true
+        k8s-master: true
+        k8s-capi: true
+        octavia: true
+        o-api: true
+        o-cw: true
+        o-da: true
+        o-hk: true
+        o-hm: true
+    required-projects:
+      - openstack/devstack-plugin-container
+      - openstack/octavia
+      - openstack/ovn-octavia-provider

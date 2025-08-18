@@ -1,0 +1,63 @@
+#!/bin/bash
+#
+# lib/magnum-capi-helm
+# Functions to control the configuration and operation of the **magnum_capi_helm** driver
+
+# Dependencies:
+#
+# - ``functions`` file
+# - ``DEST``, ``DATA_DIR``, ``STACK_USER`` must be defined
+# - ``SERVICE_{TENANT_NAME|PASSWORD}`` must be defined
+
+# ``stack.sh`` calls the entry points in this order:
+#
+# - install_magnum_capi_helm
+
+# Save trace setting
+XTRACE=$(set +o | grep xtrace)
+set +o xtrace
+
+# Defaults
+# --------
+
+# Set up default directories
+MAGNUM_CAPI_HELM_REPO=${MAGNUM_CAPI_HELM_REPO:-${GIT_BASE}/openstack/magnum-capi-helm.git}
+MAGNUM_CAPI_HELM_BRANCH=${MAGNUM_CAPI_HELM_BRANCH:-master}
+MAGNUM_CAPI_HELM_DIR=$DEST/magnum-capi-helm
+
+MAGNUM_CAPI_HELM_ADDON_PROVIDER_VERSION=${MAGNUM_CAPI_HELM_ADDON_PROVIDER_VERSION:-"0.12.0"}
+MAGNUM_CAPI_HELM_CAPI_JANITOR_OPENSTACK_VERSION=${MAGNUM_CAPI_HELM_CAPI_JANITOR_OPENSTACK_VERSION:-"0.12.0"}
+
+# install_magnum_capi_helm() - Collect source and prepare
+function install_magnum_capi_helm {
+    setup_develop $MAGNUM_CAPI_HELM_DIR
+}
+
+# install_helm() - Collect helm CLI and install
+function install_helm {
+    curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+}
+
+# install_azimuth_cluster_api_addon_provider()
+function install_azimuth_cluster_api_addon_provider {
+    helm upgrade cluster-api-addon-provider cluster-api-addon-provider \
+    --install \
+    --repo https://azimuth-cloud.github.io/cluster-api-addon-provider \
+    --version $MAGNUM_CAPI_HELM_ADDON_PROVIDER_VERSION \
+    --namespace capi-addon-system \
+    --create-namespace \
+    --wait \
+    --timeout 10m
+}
+
+# install_azimuth_cluster_api_janitor_openstack()
+function install_azimuth_capi_janitor_openstack {
+    helm upgrade cluster-api-janitor-openstack cluster-api-janitor-openstack \
+    --install \
+    --repo https://azimuth-cloud.github.io/cluster-api-janitor-openstack \
+    --version $MAGNUM_CAPI_HELM_CAPI_JANITOR_OPENSTACK_VERSION \
+    --namespace capi-janitor-system \
+    --create-namespace \
+    --wait \
+    --timeout 10m
+}

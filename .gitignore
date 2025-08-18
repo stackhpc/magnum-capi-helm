@@ -27,6 +27,7 @@ var
 sdist
 develop-eggs
 .installed.cfg
+!devstack/lib
 lib
 lib64
 
