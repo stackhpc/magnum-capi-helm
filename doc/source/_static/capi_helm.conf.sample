@@ -1,0 +1,98 @@
+[DEFAULT]
+
+
+[capi_helm]
+
+#
+# From capi_helm
+#
+
+# Path to a kubeconfig file for a management cluster,for use in the Cluster API
+# driver. Defaults to the environment variable KUBECONFIG, or if not defined
+# ~/.kube/config (string value)
+#kubeconfig_file =
+
+# Resources for each openstack cluster are created in a separate namespace
+# within the CAPI Management cluster specified by the configuration:
+# [capi_helm]/kubeconfig_file You should modify this prefix when two magnum
+# deployments want to share a single CAPI management cluster. (string value)
+#namespace_prefix = magnum
+
+# Reference to the helm chart repository for the cluster API driver. Note that
+# if helm_chart_name starts with oci:// you will want this to set this to the
+# empty string. (string value)
+#helm_chart_repo = https://azimuth-cloud.github.io/capi-helm-charts
+
+# Name of the helm chart to use from the repo specified by the config:
+# capi_driver.helm_chart_repo (string value)
+#helm_chart_name = openstack-cluster
+
+# Version of the helm chart specified by the config: capi_driver.helm_chart_repo
+# and capi_driver.helm_chart_name. A cluster label can override this. (string
+# value)
+#default_helm_chart_version = 0.10.1
+
+# Minimum RAM for flavor used to create a Kubernetes node. (integer value)
+#minimum_flavor_ram = 2048
+
+# Minimum VCPUS for flavor used to create a Kubernetes node. (integer value)
+#minimum_flavor_vcpus = 2
+
+# Default StorageClass volume type for persistent volumes. (string value)
+#csi_cinder_default_volume_type = <None>
+
+# Policy for reclaiming dynamically created persistent volumes. Can be 'Retain'
+# or 'Delete'. (string value)
+#csi_cinder_reclaim_policy = Retain
+
+# Allows the users to resize the volume by editing the corresponding PVC object.
+# (boolean value)
+#csi_cinder_allow_volume_expansion = true
+
+# Select the Nodes where the application Pods may be scheduled based on Node
+# labels. (list value)
+#csi_cinder_allowed_topologies =
+
+# Filesystem type for persistent volumes. (string value)
+#csi_cinder_fstype = ext4
+
+# The volumeBindingMode field controls when volume binding and dynamic
+# provisioning should occur. (string value)
+# Possible values:
+# WaitForFirstConsumer - <No description provided>
+# Immediate - <No description provided>
+#csi_cinder_volume_binding_mode = WaitForFirstConsumer
+
+# The default availability zone to use for Cinder volumes. (string value)
+#csi_cinder_availability_zone = nova
+
+# The value to use in the interface field of generated application credentials.
+# (string value)
+#app_cred_interface_type = public
+
+#
+#
+#             Dictionary of cluster api resources to modify api_version
+#             and plural names in string format.
+#
+#
+#             Example::
+#
+#                 '{
+#                     "K8sControlPlane": {
+#                       "api_version": "controlplane.cluster.x-k8s.io/v1beta1",
+#                       "plural_name": "kubeadmcontrolplanes"
+#                     },
+#                     "OpenstackCluster": {
+#                       "api_version":
+# "infrastructure.cluster.x-k8s.io/v1beta1",
+#                     },
+#                 }'
+#
+#
+#              (string value)
+#api_resources = {}
+
+# List of conditions to check for kubernetes control plane resource to consider
+# as ready. (list value)
+#k8s_control_plane_resource_conditions = MachinesReady,Ready,EtcdClusterHealthy,ControlPlaneComponentsHealthy
