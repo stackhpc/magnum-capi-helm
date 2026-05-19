@@ -518,8 +518,13 @@ class Driver(driver.Driver):
         return re.sub(r"[^a-z0-9\.\-\+]+", "", version)
 
     def _get_kube_version(self, image):
-        # The image should have a property containing the Kubernetes version
-        kube_version = image.get("kube_version")
+        # The image should have a property containing the Kubernetes version.
+        # image.get() uses dict.get() which bypasses the overridden __getitem__
+        # in openstacksdk Resource objects (data lives in _body, not the dict).
+        # Unknown properties are packed into image.properties by openstacksdk.
+        kube_version = image.get("kube_version") or getattr(
+            image, "properties", {}
+        ).get("kube_version")
         if not kube_version:
             raise exception.MagnumException(
                 message=f"Image {image.id} does not "
@@ -530,7 +535,10 @@ class Driver(driver.Driver):
         return re.sub(r"[^0-9\.]+", "", raw)
 
     def _get_os_distro(self, image):
-        os_distro = image.get("os_distro")
+        # image.get() uses dict.get() which bypasses the overridden __getitem__
+        # in openstacksdk Resource objects. os_distro is a declared Body field
+        # in openstacksdk Image, so getattr() reaches it via the descriptor.
+        os_distro = image.get("os_distro") or getattr(image, "os_distro", None)
         if not os_distro:
             raise exception.MagnumException(
                 message=f"Image {image.id} does not "
@@ -539,10 +547,15 @@ class Driver(driver.Driver):
         return re.sub(r"[^a-zA-Z0-9\.\-\/ ]+", "", os_distro)
 
     def _get_image_details(self, context, image_identifier):
-        osc = clients.OpenStackClients(context)
-        image = api_utils.get_openstack_resource(
-            osc.glance().images, image_identifier, "images"
-        )
+        glance = clients.OpenStackClients(context).glance()
+        if hasattr(glance.images, "get"):
+            # glanceclient
+            image = api_utils.get_openstack_resource(
+                glance.images, image_identifier, "images"
+            )
+        else:
+            # openstacksdk
+            image = glance.find_image(image_identifier)
         return (
             image.id,
             self._get_kube_version(image),
@@ -555,6 +568,8 @@ class Driver(driver.Driver):
     def _get_app_cred_id(self, cluster):
         # determine the existing application credential secret
         secret_name = self._get_app_cred_secret_name(cluster)
+        if not secret_name:
+            return None
         secret_namespace = driver_utils.cluster_namespace(cluster)
 
         # fetch the existing secret and unpack the application credential ID
@@ -662,11 +677,15 @@ class Driver(driver.Driver):
 
     def _validate_allowed_flavor(self, context, requested_flavor):
         # Compare requested flavor with allowed for Kubernetes node
-        flavors = (
-            clients.OpenStackClients(context)
-            .nova()
-            .flavors.list(min_ram=CONF.capi_helm.minimum_flavor_ram)
-        )
+        nova = clients.OpenStackClients(context).nova()
+        if hasattr(nova.flavors, "list"):
+            # novaclient
+            flavors = nova.flavors.list(
+                min_ram=CONF.capi_helm.minimum_flavor_ram
+            )
+        else:
+            # openstacksdk compute proxy
+            flavors = nova.flavors(min_ram=CONF.capi_helm.minimum_flavor_ram)
         for flavor in flavors:
             vcpus = flavor.vcpus
             LOG.debug(
@@ -816,10 +835,15 @@ class Driver(driver.Driver):
         @return dict(dict,list(dict)) containing storage classes
         """
         LOG.debug("Retrieve volume types from cinder for StorageClasses.")
-        client = clients.OpenStackClients(context)
         availability_zone = self._get_csi_cinder_availability_zone(cluster)
-        c_client = client.cinder()
-        volume_types = [i.name for i in c_client.volume_types.list()]
+        c_client = clients.OpenStackClients(context).cinder()
+        if hasattr(c_client, "volume_types"):
+            # cinderclient
+            volume_types = [i.name for i in c_client.volume_types.list()]
+        else:
+            # openstacksdk block storage proxy exposes types(),
+            # not volume_types
+            volume_types = [i.name for i in c_client.types()]
         # Use the default volume type if defined. Otherwise use the first
         # type returned by cinder.
         default_volume_type = CONF.capi_helm.csi_cinder_default_volume_type

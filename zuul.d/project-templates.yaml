@@ -36,7 +36,10 @@
                 override-checkout: stable/2025.1
         - openstack-tox-py310:
             required-projects:
-              - openstack/magnum
+              - name: openstack/magnum
+                override-checkout: stable/2026.1
+              - name: openstack/requirements
+                override-checkout: stable/2026.1
         - openstack-tox-py311:
             required-projects:
               - openstack/magnum
@@ -44,6 +47,9 @@
             required-projects:
               - openstack/magnum
         - openstack-tox-py313:
+            required-projects:
+              - openstack/magnum
+        - openstack-tox-py314:
             required-projects:
               - openstack/magnum
     gate:
@@ -59,7 +65,10 @@
                 override-checkout: stable/2025.1
         - openstack-tox-py310:
             required-projects:
-              - openstack/magnum
+              - name: openstack/magnum
+                override-checkout: stable/2026.1
+              - name: openstack/requirements
+                override-checkout: stable/2026.1
         - openstack-tox-py311:
             required-projects:
               - openstack/magnum
@@ -67,6 +76,9 @@
             required-projects:
               - openstack/magnum
         - openstack-tox-py313:
+            required-projects:
+              - openstack/magnum
+        - openstack-tox-py314:
             required-projects:
               - openstack/magnum
     post:
