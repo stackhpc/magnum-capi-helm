@@ -5,9 +5,11 @@
       Runs Magnum CAPI Helm v1.34 jobs
     check:
       jobs:
+        - magnum-capi-helm-tests-cluster-v1_34
         - magnum-capi-helm-tests-cluster-v1_34-2026_1
     gate:
       jobs:
+        - magnum-capi-helm-tests-cluster-v1_34
         - magnum-capi-helm-tests-cluster-v1_34-2026_1
 
 - job:
