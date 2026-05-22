@@ -37,6 +37,7 @@ from magnum_capi_helm import kubernetes
 LOG = logging.getLogger(__name__)
 CONF = conf.CONF
 NODE_GROUP_ROLE_CONTROLLER = "master"
+SCALE_TO_ZERO_MIN_CHART_VERSION = (0, 26, 0)
 
 
 class NodeGroupState(enum.Enum):
@@ -517,6 +518,23 @@ class Driver(driver.Driver):
         # NOTE(johngarbutt): filtering untrusted user input
         return re.sub(r"[^a-z0-9\.\-\+]+", "", version)
 
+    def _parse_chart_version(self, version_str):
+        """Return (major, minor, patch) tuple, ignore pre-release suffixes."""
+        nums = []
+        for part in re.split(r"[.\-]", version_str)[:3]:
+            if part.isdigit():
+                nums.append(int(part))
+            else:
+                break
+        return tuple(nums)
+
+    def _chart_supports_scale_to_zero(self, cluster):
+        version = self._get_chart_version(cluster)
+        return (
+            self._parse_chart_version(version)
+            >= SCALE_TO_ZERO_MIN_CHART_VERSION
+        )
+
     def _get_kube_version(self, image):
         # The image should have a property containing the Kubernetes version.
         # image.get() uses dict.get() which bypasses the overridden __getitem__
@@ -756,22 +774,30 @@ class Driver(driver.Driver):
         )
 
         if min_nodes is not None:
-            # ClusterAPI Provider OpenStack (CAPO)
-            # doesn't support scale to zero yet.
-            if min_nodes < 1:
+            if min_nodes < 0:
                 raise exception.NodeGroupInvalidInput(
                     message="Min node count must be greater than "
-                    "or equal to 1 for all node groups."
+                    "or equal to 0 for all node groups."
                 )
-            if min_nodes > nodegroup.node_count:
+            if min_nodes == 0 and not self._chart_supports_scale_to_zero(
+                cluster
+            ):
                 raise exception.NodeGroupInvalidInput(
-                    message="Min node count must be less than "
-                    "or equal to current node count"
+                    message=(
+                        "Scale to zero requires capi-helm-charts >= 0.26.0. "
+                        "Set the capi_helm_chart_version label or update "
+                        "default_helm_chart_version in magnum.conf."
+                    )
                 )
             if max_nodes is not None and max_nodes < min_nodes:
                 raise exception.NodeGroupInvalidInput(
                     message="Max node count must be greater than "
                     "or equal to min node count"
+                )
+            if min_nodes > nodegroup.node_count:
+                raise exception.NodeGroupInvalidInput(
+                    message="Min node count must be less than "
+                    "or equal to current node count"
                 )
 
         return min_nodes, max_nodes

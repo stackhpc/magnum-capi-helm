@@ -2922,6 +2922,572 @@ class ClusterAPIDriverTest(base.DbTestCase):
             self.cluster_obj.nodegroups[0],
         )
 
+    # -------------------------------------------------------------------------
+    # Scale-to-zero validation tests
+    # -------------------------------------------------------------------------
+
+    def test_validate_scale_to_zero_min_zero_allowed(self):
+        """min_node_count=0 is now allowed by the driver (scale to zero)."""
+        self.cluster_obj.labels = dict(
+            auto_scaling_enabled="true", min_node_count=0, max_node_count=5
+        )
+        # Should not raise – the driver allows min=0
+        min_nodes, max_nodes = self.driver._validate_allowed_node_counts(
+            self.cluster_obj, self.cluster_obj.nodegroups[0]
+        )
+        self.assertEqual(0, min_nodes)
+        self.assertEqual(5, max_nodes)
+
+    def test_validate_scale_to_zero_min_negative_rejected(self):
+        """Negative min_node_count is still rejected."""
+        self.cluster_obj.labels = dict(
+            auto_scaling_enabled="true", min_node_count=-1, max_node_count=5
+        )
+        self.assertRaises(
+            exception.NodeGroupInvalidInput,
+            self.driver._validate_allowed_node_counts,
+            self.cluster_obj,
+            self.cluster_obj.nodegroups[0],
+        )
+
+    def test_validate_scale_to_zero_max_lt_min_still_rejected(self):
+        """max < min is still rejected even when min is close to zero."""
+        self.cluster_obj.labels = dict(
+            auto_scaling_enabled="true", min_node_count=2, max_node_count=1
+        )
+        self.assertRaises(
+            exception.NodeGroupInvalidInput,
+            self.driver._validate_allowed_node_counts,
+            self.cluster_obj,
+            self.cluster_obj.nodegroups[0],
+        )
+
+    def test_validate_scale_to_zero_old_chart_rejected(self):
+        """min_node_count=0 with chart < 0.26.0 raises an error."""
+        self.cluster_obj.labels = dict(
+            auto_scaling_enabled="true", min_node_count=0, max_node_count=5
+        )
+        self.cluster_obj.cluster_template.labels["capi_helm_chart_version"] = (
+            "0.25.9"
+        )
+        self.assertRaises(
+            exception.NodeGroupInvalidInput,
+            self.driver._validate_allowed_node_counts,
+            self.cluster_obj,
+            self.cluster_obj.nodegroups[0],
+        )
+
+    def test_validate_scale_to_zero_newer_major_chart_allowed(self):
+        """min_node_count=0 with chart 1.0.0 (major bump) is allowed."""
+        self.cluster_obj.labels = dict(
+            auto_scaling_enabled="true", min_node_count=0, max_node_count=5
+        )
+        self.cluster_obj.cluster_template.labels["capi_helm_chart_version"] = (
+            "1.0.0"
+        )
+        min_nodes, max_nodes = self.driver._validate_allowed_node_counts(
+            self.cluster_obj, self.cluster_obj.nodegroups[0]
+        )
+        self.assertEqual(0, min_nodes)
+        self.assertEqual(5, max_nodes)
+
+    def test_validate_scale_to_zero_prerelease_chart_allowed(self):
+        """min_node_count=0 with chart 0.26.0-alpha.1 is allowed."""
+        self.cluster_obj.labels = dict(
+            auto_scaling_enabled="true", min_node_count=0, max_node_count=5
+        )
+        self.cluster_obj.cluster_template.labels["capi_helm_chart_version"] = (
+            "0.26.0-alpha.1"
+        )
+        min_nodes, max_nodes = self.driver._validate_allowed_node_counts(
+            self.cluster_obj, self.cluster_obj.nodegroups[0]
+        )
+        self.assertEqual(0, min_nodes)
+        self.assertEqual(5, max_nodes)
+
+    @mock.patch.object(driver.Driver, "_update_nodegroup_status")
+    @mock.patch.object(kubernetes.Client, "load")
+    def test_update_worker_nodegroup_status_zero_replicas_running(
+        self, mock_load, mock_update
+    ):
+        """MachineDeployment with 0 replicas in Running phase is READY."""
+        mock_client = mock.MagicMock(spec=kubernetes.Client)
+        mock_load.return_value = mock_client
+        nodegroup = mock.MagicMock()
+        nodegroup.name = "workers"
+        # A MachineDeployment scaled to 0 reports phase=Running
+        md = {
+            "status": {
+                "phase": "Running",
+                "replicas": 0,
+                "readyReplicas": 0,
+            }
+        }
+        mock_client.get_machine_deployment.return_value = md
+
+        self.driver._update_worker_nodegroup_status(
+            self.cluster_obj, nodegroup
+        )
+
+        mock_update.assert_called_once_with(
+            self.cluster_obj, mock.ANY, driver.NodeGroupState.READY
+        )
+
+    @mock.patch.object(driver.Driver, "_update_nodegroup_status")
+    @mock.patch.object(kubernetes.Client, "load")
+    def test_update_worker_nodegroup_status_zero_replicas_scaling_down(
+        self, mock_load, mock_update
+    ):
+        """ScalingDown phase (transitioning to 0 replicas) is PENDING."""
+        mock_client = mock.MagicMock(spec=kubernetes.Client)
+        mock_load.return_value = mock_client
+        nodegroup = mock.MagicMock()
+        nodegroup.name = "workers"
+        md = {"status": {"phase": "ScalingDown"}}
+        mock_client.get_machine_deployment.return_value = md
+
+        self.driver._update_worker_nodegroup_status(
+            self.cluster_obj, nodegroup
+        )
+
+        mock_update.assert_called_once_with(
+            self.cluster_obj, mock.ANY, driver.NodeGroupState.PENDING
+        )
+
+    @mock.patch.object(
+        driver.Driver, "_get_k8s_keystone_auth_enabled", return_value=False
+    )
+    @mock.patch.object(
+        driver.Driver,
+        "_storageclass_definitions",
+        return_value=mock.ANY,
+    )
+    @mock.patch.object(driver.Driver, "_validate_allowed_flavor")
+    @mock.patch.object(neutron, "get_network", autospec=True)
+    @mock.patch.object(
+        driver.Driver, "_ensure_certificate_secrets", autospec=True
+    )
+    @mock.patch.object(driver.Driver, "_create_appcred_secret", autospec=True)
+    @mock.patch.object(kubernetes.Client, "load", autospec=True)
+    @mock.patch.object(driver.Driver, "_get_image_details", autospec=True)
+    @mock.patch.object(helm.Client, "install_or_upgrade", autospec=True)
+    def test_create_cluster_zero_node_count_worker(
+        self,
+        mock_install,
+        mock_image,
+        mock_load,
+        mock_appcred,
+        mock_certs,
+        mock_get_net,
+        mock_validate_allowed_flavor,
+        mock_storageclasses,
+        mock_get_keystone_auth_enabled,
+    ):
+        """Creating a cluster with a worker nodegroup starting at 0 nodes."""
+        self.cluster_obj.labels = {}
+        for ng in self.cluster_obj.nodegroups:
+            if ng.role != "master":
+                ng.node_count = 0
+                ng.save()
+
+        mock_image.return_value = ("imageid1", "1.27.4", "ubuntu")
+        mock_client = mock.MagicMock(spec=kubernetes.Client)
+        mock_load.return_value = mock_client
+
+        self.driver.create_cluster(self.context, self.cluster_obj, 10)
+
+        helm_install_values = mock_install.call_args[0][3]
+        node_groups = helm_install_values["nodeGroups"]
+        self.assertEqual(1, len(node_groups))
+        worker_ng = node_groups[0]
+        # machineCount=0 must be passed to the Helm chart
+        self.assertEqual(0, worker_ng["machineCount"])
+        # No autoscaling keys when autoscaling is disabled
+        self.assertNotIn("autoscale", worker_ng)
+        self.assertNotIn("machineCountMin", worker_ng)
+        self.assertNotIn("machineCountMax", worker_ng)
+
+    @mock.patch.object(
+        driver.Driver, "_get_k8s_keystone_auth_enabled", return_value=False
+    )
+    @mock.patch.object(
+        driver.Driver,
+        "_storageclass_definitions",
+        return_value=mock.ANY,
+    )
+    @mock.patch.object(driver.Driver, "_validate_allowed_flavor")
+    @mock.patch.object(neutron, "get_network", autospec=True)
+    @mock.patch.object(
+        driver.Driver, "_ensure_certificate_secrets", autospec=True
+    )
+    @mock.patch.object(driver.Driver, "_create_appcred_secret", autospec=True)
+    @mock.patch.object(kubernetes.Client, "load", autospec=True)
+    @mock.patch.object(driver.Driver, "_get_image_details", autospec=True)
+    @mock.patch.object(helm.Client, "install_or_upgrade", autospec=True)
+    def test_create_cluster_autoscale_min_zero(
+        self,
+        mock_install,
+        mock_image,
+        mock_load,
+        mock_appcred,
+        mock_certs,
+        mock_get_net,
+        mock_validate_allowed_flavor,
+        mock_storageclasses,
+        mock_get_keystone_auth_enabled,
+    ):
+        """Autoscaling with min_node_count=0 passes driver validation.
+
+        Note: the Helm chart (0.10.1) does not yet support machineCountMin=0
+        in autoscaling mode. Users need a chart version that removes this
+        restriction to fully enable autoscaling scale-to-zero.
+        """
+        for ng in self.cluster_obj.nodegroups:
+            if ng.role != "master":
+                ng.node_count = 0
+                ng.save()
+
+        self.cluster_obj.labels = dict(
+            auto_scaling_enabled="true", min_node_count=0, max_node_count=5
+        )
+        mock_image.return_value = ("imageid1", "1.27.4", "ubuntu")
+        mock_client = mock.MagicMock(spec=kubernetes.Client)
+        mock_load.return_value = mock_client
+
+        self.driver.create_cluster(self.context, self.cluster_obj, 10)
+
+        helm_install_values = mock_install.call_args[0][3]
+        node_groups = helm_install_values["nodeGroups"]
+        self.assertEqual(1, len(node_groups))
+        worker_ng = node_groups[0]
+        # The driver must pass machineCountMin=0 to Helm
+        self.assertEqual("true", worker_ng["autoscale"])
+        self.assertEqual(0, worker_ng["machineCountMin"])
+        self.assertEqual(5, worker_ng["machineCountMax"])
+
+    @mock.patch.object(
+        driver.Driver, "_get_k8s_keystone_auth_enabled", return_value=False
+    )
+    @mock.patch.object(
+        driver.Driver,
+        "_storageclass_definitions",
+        return_value=mock.ANY,
+    )
+    @mock.patch.object(driver.Driver, "_validate_allowed_flavor")
+    @mock.patch.object(neutron, "get_network", autospec=True)
+    @mock.patch.object(
+        driver.Driver, "_ensure_certificate_secrets", autospec=True
+    )
+    @mock.patch.object(driver.Driver, "_create_appcred_secret", autospec=True)
+    @mock.patch.object(kubernetes.Client, "load", autospec=True)
+    @mock.patch.object(driver.Driver, "_get_image_details", autospec=True)
+    @mock.patch.object(helm.Client, "install_or_upgrade", autospec=True)
+    def test_scale_from_zero_to_n_workers(
+        self,
+        mock_install,
+        mock_image,
+        mock_load,
+        mock_appcred,
+        mock_certs,
+        mock_get_net,
+        mock_validate_allowed_flavor,
+        mock_storageclasses,
+        mock_get_keystone_auth_enabled,
+    ):
+        """Resize a worker nodegroup from 0 to N nodes (scale from zero)."""
+        self.cluster_obj.labels = {}
+        # Simulate the conductor having already updated node_count to 3
+        for ng in self.cluster_obj.nodegroups:
+            if ng.role != "master":
+                ng.node_count = 3
+                ng.save()
+
+        mock_image.return_value = ("imageid1", "1.27.4", "ubuntu")
+        mock_client = mock.MagicMock(spec=kubernetes.Client)
+        mock_load.return_value = mock_client
+
+        self.driver.resize_cluster(
+            self.context, self.cluster_obj, None, 3, None
+        )
+
+        helm_install_values = mock_install.call_args[0][3]
+        node_groups = helm_install_values["nodeGroups"]
+        self.assertEqual(1, len(node_groups))
+        self.assertEqual(3, node_groups[0]["machineCount"])
+
+    @mock.patch.object(
+        driver.Driver, "_get_k8s_keystone_auth_enabled", return_value=False
+    )
+    @mock.patch.object(
+        driver.Driver,
+        "_storageclass_definitions",
+        return_value=mock.ANY,
+    )
+    @mock.patch.object(driver.Driver, "_validate_allowed_flavor")
+    @mock.patch.object(neutron, "get_network", autospec=True)
+    @mock.patch.object(
+        driver.Driver, "_ensure_certificate_secrets", autospec=True
+    )
+    @mock.patch.object(driver.Driver, "_create_appcred_secret", autospec=True)
+    @mock.patch.object(kubernetes.Client, "load", autospec=True)
+    @mock.patch.object(driver.Driver, "_get_image_details", autospec=True)
+    @mock.patch.object(helm.Client, "install_or_upgrade", autospec=True)
+    def test_update_nodegroup_to_zero_node_count(
+        self,
+        mock_install,
+        mock_image,
+        mock_load,
+        mock_appcred,
+        mock_certs,
+        mock_get_net,
+        mock_validate_allowed_flavor,
+        mock_storageclasses,
+        mock_get_keystone_auth_enabled,
+    ):
+        """update_nodegroup with node_count=0 passes machineCount=0 to Helm."""
+        self.cluster_obj.labels = {}
+        worker_ng = None
+        for ng in self.cluster_obj.nodegroups:
+            if ng.role != "master":
+                worker_ng = ng
+                ng.node_count = 0
+                ng.save()
+
+        mock_image.return_value = ("imageid1", "1.27.4", "ubuntu")
+        mock_client = mock.MagicMock(spec=kubernetes.Client)
+        mock_load.return_value = mock_client
+
+        self.driver.update_nodegroup(self.context, self.cluster_obj, worker_ng)
+
+        helm_install_values = mock_install.call_args[0][3]
+        node_groups = helm_install_values["nodeGroups"]
+        self.assertEqual(1, len(node_groups))
+        self.assertEqual(0, node_groups[0]["machineCount"])
+
+    @mock.patch.object(
+        driver.Driver, "_get_k8s_keystone_auth_enabled", return_value=False
+    )
+    @mock.patch.object(
+        driver.Driver,
+        "_storageclass_definitions",
+        return_value=mock.ANY,
+    )
+    @mock.patch.object(driver.Driver, "_validate_allowed_flavor")
+    @mock.patch.object(neutron, "get_network", autospec=True)
+    @mock.patch.object(
+        driver.Driver, "_ensure_certificate_secrets", autospec=True
+    )
+    @mock.patch.object(driver.Driver, "_create_appcred_secret", autospec=True)
+    @mock.patch.object(kubernetes.Client, "load", autospec=True)
+    @mock.patch.object(driver.Driver, "_get_image_details", autospec=True)
+    @mock.patch.object(helm.Client, "install_or_upgrade", autospec=True)
+    def test_create_nodegroup_zero_count_allowed(
+        self,
+        mock_install,
+        mock_image,
+        mock_load,
+        mock_appcred,
+        mock_certs,
+        mock_get_net,
+        mock_validate_allowed_flavor,
+        mock_storageclasses,
+        mock_get_keystone_auth_enabled,
+    ):
+        """create_nodegroup with node_count=0 is allowed (scale from zero)."""
+        self.cluster_obj.labels = {}
+        new_ng = obj_utils.create_test_nodegroup(
+            self.context,
+            uuid=uuid4(),
+            id=789,
+            name="zero-start-group",
+            node_count=0,
+        )
+        self.cluster_obj.nodegroups.append(new_ng)
+        mock_image.return_value = ("imageid1", "1.27.4", "ubuntu")
+        mock_client = mock.MagicMock(spec=kubernetes.Client)
+        mock_load.return_value = mock_client
+
+        self.driver.create_nodegroup(self.context, self.cluster_obj, new_ng)
+
+        helm_install_values = mock_install.call_args[0][3]
+        node_groups = helm_install_values["nodeGroups"]
+        zero_ngs = [ng for ng in node_groups if ng["name"] == new_ng.name]
+        self.assertEqual(1, len(zero_ngs))
+        self.assertEqual(0, zero_ngs[0]["machineCount"])
+
+    @mock.patch.object(
+        driver.Driver, "_get_k8s_keystone_auth_enabled", return_value=False
+    )
+    @mock.patch.object(
+        driver.Driver,
+        "_storageclass_definitions",
+        return_value=mock.ANY,
+    )
+    @mock.patch.object(driver.Driver, "_validate_allowed_flavor")
+    @mock.patch.object(neutron, "get_network", autospec=True)
+    @mock.patch.object(
+        driver.Driver, "_ensure_certificate_secrets", autospec=True
+    )
+    @mock.patch.object(driver.Driver, "_create_appcred_secret", autospec=True)
+    @mock.patch.object(kubernetes.Client, "load", autospec=True)
+    @mock.patch.object(driver.Driver, "_get_image_details", autospec=True)
+    @mock.patch.object(helm.Client, "install_or_upgrade", autospec=True)
+    def test_autoscale_extra_nodegroup_min_zero(
+        self,
+        mock_install,
+        mock_image,
+        mock_load,
+        mock_appcred,
+        mock_certs,
+        mock_get_net,
+        mock_validate_allowed_flavor,
+        mock_storageclasses,
+        mock_get_keystone_auth_enabled,
+    ):
+        """Autoscaling extra nodegroup with min_node_count=0 is forwarded."""
+        self.cluster_obj.labels = {"auto_scaling_enabled": "true"}
+
+        zero_min_ng = obj_utils.create_test_nodegroup(
+            self.context,
+            uuid=uuid4(),
+            id=321,
+            name="zero-min-group",
+            node_count=0,
+            min_node_count=0,
+            max_node_count=4,
+        )
+        self.cluster_obj.nodegroups.append(zero_min_ng)
+
+        mock_image.return_value = ("imageid1", "1.27.4", "ubuntu")
+        mock_client = mock.MagicMock(spec=kubernetes.Client)
+        mock_load.return_value = mock_client
+
+        self.driver.create_cluster(self.context, self.cluster_obj, 10)
+
+        helm_install_values = mock_install.call_args[0][3]
+        node_groups = helm_install_values["nodeGroups"]
+        zero_ngs = [ng for ng in node_groups if ng["name"] == zero_min_ng.name]
+        self.assertEqual(1, len(zero_ngs))
+        ng = zero_ngs[0]
+        self.assertEqual("true", ng["autoscale"])
+        self.assertEqual(0, ng["machineCountMin"])
+        self.assertEqual(4, ng["machineCountMax"])
+
+    @mock.patch.object(
+        driver.Driver, "_get_k8s_keystone_auth_enabled", return_value=False
+    )
+    @mock.patch.object(
+        driver.Driver,
+        "_storageclass_definitions",
+        return_value=mock.ANY,
+    )
+    @mock.patch.object(driver.Driver, "_validate_allowed_flavor")
+    @mock.patch.object(neutron, "get_network", autospec=True)
+    @mock.patch.object(
+        driver.Driver, "_ensure_certificate_secrets", autospec=True
+    )
+    @mock.patch.object(driver.Driver, "_create_appcred_secret", autospec=True)
+    @mock.patch.object(kubernetes.Client, "load", autospec=True)
+    @mock.patch.object(driver.Driver, "_get_image_details", autospec=True)
+    @mock.patch.object(helm.Client, "install_or_upgrade", autospec=True)
+    def test_autoscale_extra_nodegroup_min_zero_equal_max_no_autoscale(
+        self,
+        mock_install,
+        mock_image,
+        mock_load,
+        mock_appcred,
+        mock_certs,
+        mock_get_net,
+        mock_validate_allowed_flavor,
+        mock_storageclasses,
+        mock_get_keystone_auth_enabled,
+    ):
+        """Extra nodegroup with min=max=0 disables autoscaling (min==max)."""
+        self.cluster_obj.labels = {"auto_scaling_enabled": "true"}
+
+        # min == max → autoscaling disabled for this nodegroup
+        zero_ng = obj_utils.create_test_nodegroup(
+            self.context,
+            uuid=uuid4(),
+            id=654,
+            name="zero-zero-group",
+            node_count=0,
+            min_node_count=0,
+            max_node_count=0,
+        )
+        self.cluster_obj.nodegroups.append(zero_ng)
+
+        mock_image.return_value = ("imageid1", "1.27.4", "ubuntu")
+        mock_client = mock.MagicMock(spec=kubernetes.Client)
+        mock_load.return_value = mock_client
+
+        self.driver.create_cluster(self.context, self.cluster_obj, 10)
+
+        helm_install_values = mock_install.call_args[0][3]
+        node_groups = helm_install_values["nodeGroups"]
+        zero_ngs = [ng for ng in node_groups if ng["name"] == zero_ng.name]
+        self.assertEqual(1, len(zero_ngs))
+        ng = zero_ngs[0]
+        # min == max → autoscale args NOT emitted
+        self.assertNotIn("autoscale", ng)
+        self.assertNotIn("machineCountMin", ng)
+        self.assertEqual(0, ng["machineCount"])
+
+    @mock.patch.object(
+        driver.Driver, "_get_k8s_keystone_auth_enabled", return_value=False
+    )
+    @mock.patch.object(
+        driver.Driver,
+        "_storageclass_definitions",
+        return_value=mock.ANY,
+    )
+    @mock.patch.object(driver.Driver, "_validate_allowed_flavor")
+    @mock.patch.object(neutron, "get_network", autospec=True)
+    @mock.patch.object(
+        driver.Driver, "_ensure_certificate_secrets", autospec=True
+    )
+    @mock.patch.object(driver.Driver, "_create_appcred_secret", autospec=True)
+    @mock.patch.object(kubernetes.Client, "load", autospec=True)
+    @mock.patch.object(driver.Driver, "_get_image_details", autospec=True)
+    @mock.patch.object(helm.Client, "install_or_upgrade", autospec=True)
+    def test_default_nodegroup_autoscale_min_zero_max_n(
+        self,
+        mock_install,
+        mock_image,
+        mock_load,
+        mock_appcred,
+        mock_certs,
+        mock_get_net,
+        mock_validate_allowed_flavor,
+        mock_storageclasses,
+        mock_get_keystone_auth_enabled,
+    ):
+        """Default nodegroup: autoscaling with min=0 via labels."""
+        self.cluster_obj.labels = dict(
+            auto_scaling_enabled="true", min_node_count=0, max_node_count=5
+        )
+        for ng in self.cluster_obj.nodegroups:
+            if ng.role != "master":
+                ng.node_count = 0
+                ng.save()
+
+        mock_image.return_value = ("imageid1", "1.27.4", "ubuntu")
+        mock_client = mock.MagicMock(spec=kubernetes.Client)
+        mock_load.return_value = mock_client
+
+        self.driver.create_cluster(self.context, self.cluster_obj, 10)
+
+        helm_install_values = mock_install.call_args[0][3]
+        node_groups = helm_install_values["nodeGroups"]
+        default_ng = next(
+            ng
+            for ng in node_groups
+            if ng["name"] == self.cluster_obj.default_ng_worker.name
+        )
+        self.assertEqual("true", default_ng["autoscale"])
+        self.assertEqual(0, default_ng["machineCountMin"])
+        self.assertEqual(5, default_ng["machineCountMax"])
+
     @mock.patch.object(
         driver.Driver, "_get_k8s_keystone_auth_enabled", return_value=False
     )
@@ -3179,12 +3745,10 @@ class ClusterAPIDriverTest(base.DbTestCase):
         )
 
         # Check extra autoscaling node group values
-        # NOTE: CAPO doesn't support scale to zero so
-        # min node count should be max(1, ng.min_node_count)
         ng = helm_values_autoscale_nodegroup[0]
         self.assertEqual(ng["autoscale"], "true")
         self.assertEqual(
-            ng["machineCountMin"], max(1, auto_scale_nodegroup.min_node_count)
+            ng["machineCountMin"], auto_scale_nodegroup.min_node_count
         )
         self.assertEqual(
             ng["machineCountMax"], auto_scale_nodegroup.max_node_count
