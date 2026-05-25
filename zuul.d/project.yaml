@@ -3,6 +3,7 @@
     queue: magnum
     templates:
       - magnum-capi-helm-tests-cluster-v1_34
+      - magnum-capi-helm-tests-cluster-v1_35
       - openstack-cover-jobs-magnum
       - openstack-python3-jobs-magnum
       - release-notes-jobs-python3
