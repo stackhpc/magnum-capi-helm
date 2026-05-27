@@ -6,9 +6,11 @@
     check:
       jobs:
         - magnum-capi-helm-tests-cluster-calico-v1-34
+        - magnum-capi-helm-tests-cluster-cilium-v1-34
     gate:
       jobs:
         - magnum-capi-helm-tests-cluster-calico-v1-34
+        - magnum-capi-helm-tests-cluster-cilium-v1-34
 
 - project-template:
     name: magnum-capi-helm-tests-cluster
@@ -17,11 +19,15 @@
     check:
       jobs:
         - magnum-capi-helm-tests-cluster-calico-v1-34
+        - magnum-capi-helm-tests-cluster-cilium-v1-34
         - magnum-capi-helm-tests-cluster-calico-v1-35
+        - magnum-capi-helm-tests-cluster-cilium-v1-35
     gate:
       jobs:
         - magnum-capi-helm-tests-cluster-calico-v1-34
+        - magnum-capi-helm-tests-cluster-cilium-v1-34
         - magnum-capi-helm-tests-cluster-calico-v1-35
+        - magnum-capi-helm-tests-cluster-cilium-v1-35
 
 - project-template:
     name: magnum-capi-helm-tests-cluster-2026-1

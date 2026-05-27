@@ -70,3 +70,17 @@
           $TEMPEST_CONFIG:
             magnum:
               network_driver: calico
+
+- job:
+    name: magnum-capi-helm-tests-cluster-cilium
+    parent: magnum-capi-helm-tests-cluster
+    vars:
+      devstack_local_conf:
+        post-config:
+          $MAGNUM_CONF:
+            cluster_template:
+              kubernetes_allowed_network_drivers: flannel,calico,cilium
+        test-config:
+          $TEMPEST_CONFIG:
+            magnum:
+              network_driver: cilium
