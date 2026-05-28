@@ -22,12 +22,19 @@ sys.path.insert(0, os.path.abspath("../.."))
 extensions = [
     "sphinx.ext.autodoc",
     "openstackdocstheme",
+    "oslo_config.sphinxext",
+    "oslo_config.sphinxconfiggen",
 ]
 
 # openstackdocstheme options
 openstackdocs_repo_name = "openstack/magnum-capi-helm"
 openstackdocs_pdf_link = True
 openstackdocs_use_storyboard = False
+
+# sphinxcontrib.apidoc options
+config_generator_config_file = [
+    ("../../etc/oslo-config-generator/capi_helm.conf", "_static/capi_helm"),
+]
 
 # autodoc generation is a bit aggressive and a nuisance when doing heavy
 # text edit cycles.

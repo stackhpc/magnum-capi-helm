@@ -136,19 +136,24 @@ capi_helm_opts = [
         default={},
         help=(
             """
-            Dictionary of cluster api resources to modify
-            api_version and plural names in string format.
 
-            "Example:"
-            '{
-                "K8sControlPlane": {
-                    "api_version": "controlplane.cluster.x-k8s.io/v1beta1",
-                    "plural_name": "kubeadmcontrolplanes"
-                },
-                "OpenstackCluster": {
-                    "api_version": "infrastructure.cluster.x-k8s.io/v1beta1",
-                },
-            }'
+            Dictionary of cluster api resources to modify api_version
+            and plural names in string format.
+
+
+            Example::
+
+                '{
+                    "K8sControlPlane": {
+                      "api_version": "controlplane.cluster.x-k8s.io/v1beta1",
+                      "plural_name": "kubeadmcontrolplanes"
+                    },
+                    "OpenstackCluster": {
+                      "api_version": "infrastructure.cluster.x-k8s.io/v1beta1",
+                    },
+                }'
+
+
             """
         ),
     ),
@@ -170,3 +175,7 @@ capi_helm_opts = [
 CONF = cfg.CONF
 CONF.register_group(capi_helm_group)
 CONF.register_opts(capi_helm_opts, group=capi_helm_group)
+
+
+def list_capi_opts():
+    return [(capi_helm_group, [o]) for o in capi_helm_opts]
