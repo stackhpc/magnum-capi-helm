@@ -7,10 +7,14 @@
       jobs:
         - magnum-capi-helm-tests-cluster-v1_34
         - magnum-capi-helm-tests-cluster-v1_34-2026_1
+        - magnum-capi-helm-tests-cluster-v1_34-2025_2
+        - magnum-capi-helm-tests-cluster-v1_34-2025_1
     gate:
       jobs:
         - magnum-capi-helm-tests-cluster-v1_34
         - magnum-capi-helm-tests-cluster-v1_34-2026_1
+        - magnum-capi-helm-tests-cluster-v1_34-2025_2
+        - magnum-capi-helm-tests-cluster-v1_34-2025_1
 
 - job:
     name: magnum-capi-helm-tests-cluster-v1_34-2026_1
@@ -18,6 +22,20 @@
     required-projects:
       - name: openstack/magnum
         override-checkout: stable/2026.1
+
+- job:
+    name: magnum-capi-helm-tests-cluster-v1_34-2025_2
+    parent: magnum-capi-helm-tests-cluster-v1_34
+    required-projects:
+      - name: openstack/magnum
+        override-checkout: stable/2025.2
+
+- job:
+    name: magnum-capi-helm-tests-cluster-v1_34-2025_1
+    parent: magnum-capi-helm-tests-cluster-v1_34
+    required-projects:
+      - name: openstack/magnum
+        override-checkout: stable/2025.1
 
 - job:
     name: magnum-capi-helm-tests-cluster-v1_34
