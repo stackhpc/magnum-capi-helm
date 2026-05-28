@@ -14,6 +14,7 @@
       - zuul: openstack/devstack-plugin-container
     vars:
       kube_version: "v1.34.7"
+      kube_version_dir: "2026.04-5"
       devstack_localrc:
         CONTAINER_ENGINE: "crio"
         CRIO_VERSION: "1.32.1"
@@ -27,7 +28,7 @@
         K8S_VERSION: "1.34.7"
         K8S_TOKEN: "0cvq6p.k454yiandj1tjxxv"
         K8S_COPY_KUBECONFIG_PATH: "/etc/magnum/kubeconfig"
-        MAGNUM_GUEST_IMAGE_URL: "https://github.com/vexxhost/capo-image-elements/releases/download/2026.04-5/ubuntu-24.04-{{ kube_version }}.qcow2"
+        MAGNUM_GUEST_IMAGE_URL: "https://github.com/vexxhost/capo-image-elements/releases/download/{{ kube_version_dir }}/ubuntu-24.04-{{ kube_version }}.qcow2"
         MAGNUM_GUEST_IMAGE_EXTRA_PROPERTIES: "--property kube_version={{ kube_version }}"
         OCTAVIA_NODE: api
       devstack_local_conf:
