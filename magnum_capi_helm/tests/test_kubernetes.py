@@ -47,6 +47,19 @@ TEST_KUBECONFIG = yaml.safe_load(TEST_KUBECONFIG_YAML)
 
 
 class TestKubernetesClient(base.TestCase):
+    def assert_request_called_once_with(self, mock_request, *args, **kwargs):
+        # requests >= 2.34 makes Session.get() pass params=None explicitly
+        # to Session.request(); older versions omit it. Drop the implicit
+        # params=None so the assertion works on both.
+        mock_request.assert_called_once()
+        actual_args, actual_kwargs = mock_request.call_args
+        if "params" not in kwargs and actual_kwargs.get("params") is None:
+            actual_kwargs = {
+                k: v for k, v in actual_kwargs.items() if k != "params"
+            }
+        self.assertEqual(args, actual_args)
+        self.assertEqual(kwargs, actual_kwargs)
+
     # Basic lookup, non "-data" key
     def test_file_or_data(self):
         client = kubernetes.Client(TEST_KUBECONFIG)
@@ -222,7 +235,8 @@ class TestKubernetesClient(base.TestCase):
         secret_namespace = "ns1"
         client.get_secret(secret_name, secret_namespace)
 
-        mock_request.assert_called_once_with(
+        self.assert_request_called_once_with(
+            mock_request,
             "GET",
             "https://test:6443/api/v1/namespaces"
             f"/{secret_namespace}/secrets/{secret_name}",
@@ -250,7 +264,8 @@ class TestKubernetesClient(base.TestCase):
             client.get_secret_value(secret_name, secret_namespace, secret_key),
             secret_value,
         )
-        mock_request.assert_called_once_with(
+        self.assert_request_called_once_with(
+            mock_request,
             "GET",
             "https://test:6443/api/v1/namespaces"
             f"/{secret_namespace}/secrets/{secret_name}",
@@ -267,7 +282,8 @@ class TestKubernetesClient(base.TestCase):
 
         cluster = client.get_capi_cluster("name", "ns1")
 
-        mock_request.assert_called_once_with(
+        self.assert_request_called_once_with(
+            mock_request,
             "GET",
             (
                 "https://test:6443/apis/cluster.x-k8s.io/"
@@ -310,7 +326,8 @@ class TestKubernetesClient(base.TestCase):
 
         cluster = client.get_k8s_control_plane("name", "ns1")
 
-        mock_request.assert_called_once_with(
+        self.assert_request_called_once_with(
+            mock_request,
             "GET",
             (
                 "https://test:6443/apis/controlplane.cluster.x-k8s.io/"
@@ -330,7 +347,8 @@ class TestKubernetesClient(base.TestCase):
 
         cluster = client.get_machine_deployment("name", "ns1")
 
-        mock_request.assert_called_once_with(
+        self.assert_request_called_once_with(
+            mock_request,
             "GET",
             (
                 "https://test:6443/apis/cluster.x-k8s.io/"
