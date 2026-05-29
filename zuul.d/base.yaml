@@ -60,3 +60,7 @@
         o-da: true
         o-hk: true
         o-hm: true
+
+- job:
+    name: magnum-capi-helm-tests-cluster-calico
+    parent: magnum-capi-helm-tests-cluster

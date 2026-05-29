@@ -1,0 +1,28 @@
+---
+- job:
+    name: magnum-capi-helm-tests-cluster-calico-v1-35
+    parent: magnum-capi-helm-tests-cluster-calico
+    vars:
+      kube_version: "v1.35.5"
+      kube_version_dir: "2026.05-6"
+
+- job:
+    name: magnum-capi-helm-tests-cluster-calico-v1-35-2025-1
+    parent: magnum-capi-helm-tests-cluster-calico-v1-35
+    required-projects:
+      - name: openstack/magnum
+        override-checkout: stable/2025.1
+
+- job:
+    name: magnum-capi-helm-tests-cluster-calico-v1-35-2025-2
+    parent: magnum-capi-helm-tests-cluster-calico-v1-35
+    required-projects:
+      - name: openstack/magnum
+        override-checkout: stable/2025.2
+
+- job:
+    name: magnum-capi-helm-tests-cluster-calico-v1-35-2026-1
+    parent: magnum-capi-helm-tests-cluster-calico-v1-35
+    required-projects:
+      - name: openstack/magnum
+        override-checkout: stable/2026.1

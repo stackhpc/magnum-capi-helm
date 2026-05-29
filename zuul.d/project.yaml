@@ -2,8 +2,10 @@
 - project:
     queue: magnum
     templates:
-      - magnum-capi-helm-tests-cluster-v1_34
-      - magnum-capi-helm-tests-cluster-v1_35
+      - magnum-capi-helm-tests-cluster
+      - magnum-capi-helm-tests-cluster-2026-1
+      - magnum-capi-helm-tests-cluster-2025-2
+      - magnum-capi-helm-tests-cluster-2025-1
       - openstack-cover-jobs-magnum
       - openstack-python3-jobs-magnum
       - release-notes-jobs-python3
