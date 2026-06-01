@@ -1,0 +1,15 @@
+---
+features:
+  - |
+    All cluster label defaults are now configurable site-wide via a new
+    ``[capi_helm_cluster_labels]`` section in ``magnum.conf``. Each supported
+    label has a typed option with a default value that users can still override
+    per cluster or template via Magnum labels.
+deprecations:
+  - |
+    The ``csi_cinder_availability_zone``, ``csi_cinder_reclaim_policy``,
+    ``csi_cinder_volume_binding_mode``, ``csi_cinder_fstype``, and
+    ``csi_cinder_allow_volume_expansion`` options have moved from the
+    ``[capi_helm]`` section to the new ``[capi_helm_cluster_labels]`` section.
+    The old locations are still accepted but will produce a deprecation
+    warning. Please update your ``magnum.conf`` accordingly.

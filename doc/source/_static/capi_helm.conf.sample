@@ -41,30 +41,9 @@
 # Default StorageClass volume type for persistent volumes. (string value)
 #csi_cinder_default_volume_type = <None>
 
-# Policy for reclaiming dynamically created persistent volumes. Can be 'Retain'
-# or 'Delete'. (string value)
-#csi_cinder_reclaim_policy = Retain
-
-# Allows the users to resize the volume by editing the corresponding PVC object.
-# (boolean value)
-#csi_cinder_allow_volume_expansion = true
-
 # Select the Nodes where the application Pods may be scheduled based on Node
 # labels. (list value)
 #csi_cinder_allowed_topologies =
-
-# Filesystem type for persistent volumes. (string value)
-#csi_cinder_fstype = ext4
-
-# The volumeBindingMode field controls when volume binding and dynamic
-# provisioning should occur. (string value)
-# Possible values:
-# WaitForFirstConsumer - <No description provided>
-# Immediate - <No description provided>
-#csi_cinder_volume_binding_mode = WaitForFirstConsumer
-
-# The default availability zone to use for Cinder volumes. (string value)
-#csi_cinder_availability_zone = nova
 
 # The value to use in the interface field of generated application credentials.
 # (string value)
@@ -96,3 +75,122 @@
 # List of conditions to check for kubernetes control plane resource to consider
 # as ready. (list value)
 #k8s_control_plane_resource_conditions = MachinesReady,Ready,EtcdClusterHealthy,ControlPlaneComponentsHealthy
+
+
+[capi_helm_cluster_labels]
+
+#
+# From capi_helm_cluster_labels
+#
+
+# Size of the etcd block device in GB. 0 means use the default ephemeral disk.
+# (integer value)
+#etcd_blockdevice_size = 0
+
+# Storage type for the etcd block device. 'volume' uses a Cinder volume; 'local'
+# uses an ephemeral disk. (string value)
+# Possible values:
+# volume - <No description provided>
+# local - <No description provided>
+#etcd_blockdevice_type = volume
+
+# Cinder volume type for the etcd block device. (string value)
+#etcd_blockdevice_volume_type =
+
+# Availability zone for the etcd Cinder volume. (string value)
+#etcd_blockdevice_volume_az =
+
+# Deprecated: use etcd_blockdevice_size instead. (integer value)
+# Deprecated group/name - [capi_helm]/etcd_volume_size
+#etcd_volume_size = 0
+
+# Deprecated: use etcd_blockdevice_volume_type instead. (string value)
+# Deprecated group/name - [capi_helm]/etcd_volume_type
+#etcd_volume_type =
+
+# Enable the monitoring addon on the cluster. (boolean value)
+#monitoring_enabled = false
+
+# Enable the Kubernetes Dashboard addon. (boolean value)
+#kube_dashboard_enabled = true
+
+# Enable auto-healing for cluster nodes. (boolean value)
+#auto_healing_enabled = true
+
+# Enable the cluster autoscaler. (boolean value)
+#auto_scaling_enabled = false
+
+# Minimum node count for autoscaling. Defaults to the nodegroup node_count when
+# unset. (integer value)
+#min_node_count = <None>
+
+# Maximum node count for autoscaling. Defaults to the nodegroup node_count when
+# unset. (integer value)
+#max_node_count = <None>
+
+# Enable the Keystone authentication webhook. (boolean value)
+#keystone_auth_enabled = false
+
+# Default availability zone for Cinder volumes. (string value)
+# Deprecated group/name - [capi_helm]/csi_cinder_availability_zone
+#csi_cinder_availability_zone = nova
+
+# Reclaim policy for dynamically provisioned persistent volumes. Can be 'Retain'
+# or 'Delete'. (string value)
+# Possible values:
+# Retain - <No description provided>
+# Delete - <No description provided>
+# Deprecated group/name - [capi_helm]/csi_cinder_reclaim_policy
+#csi_cinder_reclaim_policy = Retain
+
+# Controls when volume binding and dynamic provisioning occur. Can be
+# 'WaitForFirstConsumer' or 'Immediate'. (string value)
+# Possible values:
+# WaitForFirstConsumer - <No description provided>
+# Immediate - <No description provided>
+# Deprecated group/name - [capi_helm]/csi_cinder_volume_binding_mode
+#csi_cinder_volume_binding_mode = WaitForFirstConsumer
+
+# Filesystem type for persistent volumes. (string value)
+# Deprecated group/name - [capi_helm]/csi_cinder_fstype
+#csi_cinder_fstype = ext4
+
+# Allow users to resize persistent volumes by editing the PVC. (boolean value)
+# Deprecated group/name - [capi_helm]/csi_cinder_allow_volume_expansion
+#csi_cinder_allow_volume_expansion = true
+
+# Octavia load balancer provider (e.g. 'amphora' or 'ovn'). (string value)
+#octavia_provider = amphora
+
+# Load balancer algorithm. When unset, defaults to SOURCE_IP_PORT for the ovn
+# provider and ROUND_ROBIN for all others. (string value)
+#octavia_lb_algorithm =
+
+# Enable health checks on the load balancer. (boolean value)
+#octavia_lb_healthcheck = true
+
+# Associate a floating IP with the API load balancer. (boolean value)
+#master_lb_floating_ip_enabled = true
+
+# CIDR for the node network when no fixed_subnet is specified. (string value)
+#fixed_subnet_cidr = 10.0.0.0/24
+
+# Comma-separated list of CIDRs allowed to reach the API load balancer. Empty
+# means all CIDRs are allowed. (string value)
+#api_master_lb_allowed_cidrs =
+
+# Name of an additional Neutron network to attach to each node. (string value)
+#extra_network_name =
+
+# Root volume type. Falls back to the cinder config option
+# default_boot_volume_type when unset. (string value)
+#boot_volume_type = <None>
+
+# Root volume size in GB. Falls back to the cinder config option
+# default_boot_volume_size when unset. (integer value)
+#boot_volume_size = <None>
+
+# Helm chart version to use. Can only be set via the cluster template label, not
+# overridden per cluster. Falls back to capi_helm.default_helm_chart_version
+# when unset. (string value)
+#capi_helm_chart_version =

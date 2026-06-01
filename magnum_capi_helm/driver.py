@@ -38,6 +38,10 @@ LOG = logging.getLogger(__name__)
 CONF = conf.CONF
 NODE_GROUP_ROLE_CONTROLLER = "master"
 
+_REGISTERED_LABEL_NAMES = frozenset(
+    opt.name for opt in conf.capi_helm_cluster_labels_opts
+)
+
 
 class NodeGroupState(enum.Enum):
     NOT_PRESENT = 1
@@ -487,6 +491,11 @@ class Driver(driver.Driver):
             )
 
     def _label(self, cluster, key, default):
+        if key not in _REGISTERED_LABEL_NAMES:
+            raise ValueError(
+                f"Cluster label '{key}' is not registered in "
+                "capi_helm_cluster_labels. Add it to conf.py first."
+            )
         all_labels = helm.mergeconcat(
             cluster.cluster_template.labels, cluster.labels
         )
@@ -508,6 +517,25 @@ class Driver(driver.Driver):
             return int(cluster_label)
         except ValueError:
             return default
+
+    def _get_label_csv(self, cluster, label, default):
+        """Return a cluster label as a filtered list split on commas."""
+        if label not in _REGISTERED_LABEL_NAMES:
+            raise ValueError(
+                f"Cluster label '{label}' is not registered in "
+                "capi_helm_cluster_labels. Add it to conf.py first."
+            )
+        all_labels = helm.mergeconcat(
+            cluster.cluster_template.labels, cluster.labels
+        )
+        raw = (all_labels or {}).get(label, "") or default
+        if not raw:
+            return []
+        return [
+            re.sub(r"[^a-zA-Z0-9\.\-\/\:]+", "", entry.strip())
+            for entry in str(raw).split(",")
+            if entry.strip()
+        ]
 
     def _get_chart_version(self, cluster):
         version = cluster.cluster_template.labels.get(
@@ -592,18 +620,25 @@ class Driver(driver.Driver):
         )
 
     def _get_etcd_config(self, cluster):
+        lconf = CONF.capi_helm_cluster_labels
         # Support new-style and legacy labels for volume size and type, with
         # new-style labels taking precedence
         etcd_size = self._get_label_int(
             cluster,
             "etcd_blockdevice_size",
-            self._get_label_int(cluster, "etcd_volume_size", 0),
+            self._get_label_int(
+                cluster,
+                "etcd_volume_size",
+                lconf.etcd_blockdevice_size,
+            ),
         )
         if etcd_size > 0:
             etcd_block_device = {"size": etcd_size}
             # The block device type can be either local or volume
             etcd_bd_type = self._label(
-                cluster, "etcd_blockdevice_type", "volume"
+                cluster,
+                "etcd_blockdevice_type",
+                lconf.etcd_blockdevice_type,
             )
             if etcd_bd_type == "local":
                 etcd_block_device["type"] = "Local"
@@ -613,13 +648,19 @@ class Driver(driver.Driver):
                 etcd_volume_type = self._label(
                     cluster,
                     "etcd_blockdevice_volume_type",
-                    self._label(cluster, "etcd_volume_type", ""),
+                    self._label(
+                        cluster,
+                        "etcd_volume_type",
+                        lconf.etcd_blockdevice_volume_type,
+                    ),
                 )
                 if etcd_volume_type:
                     etcd_block_device["volumeType"] = etcd_volume_type
 
                 etcd_volume_az = self._label(
-                    cluster, "etcd_blockdevice_volume_az", ""
+                    cluster,
+                    "etcd_blockdevice_volume_az",
+                    lconf.etcd_blockdevice_volume_az,
                 )
                 if etcd_volume_az:
                     etcd_block_device["availabilityZone"] = etcd_volume_az
@@ -635,19 +676,32 @@ class Driver(driver.Driver):
             return None
 
     def _get_monitoring_enabled(self, cluster):
-        #  NOTE(mkjpryor) default off, like heat driver,
-        #  as requires cinder and takes a while
-        return self._get_label_bool(cluster, "monitoring_enabled", False)
+        return self._get_label_bool(
+            cluster,
+            "monitoring_enabled",
+            CONF.capi_helm_cluster_labels.monitoring_enabled,
+        )
 
     def _get_kube_dash_enabled(self, cluster):
-        #  NOTE(mkjpryor) default on, like the heat driver
-        return self._get_label_bool(cluster, "kube_dashboard_enabled", True)
+        return self._get_label_bool(
+            cluster,
+            "kube_dashboard_enabled",
+            CONF.capi_helm_cluster_labels.kube_dashboard_enabled,
+        )
 
     def _get_autoheal_enabled(self, cluster):
-        return self._get_label_bool(cluster, "auto_healing_enabled", True)
+        return self._get_label_bool(
+            cluster,
+            "auto_healing_enabled",
+            CONF.capi_helm_cluster_labels.auto_healing_enabled,
+        )
 
     def _get_autoscale_enabled(self, cluster):
-        return self._get_label_bool(cluster, "auto_scaling_enabled", False)
+        return self._get_label_bool(
+            cluster,
+            "auto_scaling_enabled",
+            CONF.capi_helm_cluster_labels.auto_scaling_enabled,
+        )
 
     def _get_autoscale_values(self, cluster, nodegroup):
         auto_scale = self._get_autoscale_enabled(cluster)
@@ -662,7 +716,11 @@ class Driver(driver.Driver):
         return auto_scale_args
 
     def _get_k8s_keystone_auth_enabled(self, cluster):
-        return self._get_label_bool(cluster, "keystone_auth_enabled", False)
+        return self._get_label_bool(
+            cluster,
+            "keystone_auth_enabled",
+            CONF.capi_helm_cluster_labels.keystone_auth_enabled,
+        )
 
     def _get_fixed_network_id(self, context, cluster):
         network = cluster.fixed_network
@@ -737,11 +795,17 @@ class Driver(driver.Driver):
             # We still want to be able to override the default node
             # group values with labels for consistent behaviour with
             # Magnum Heat driver.
+            conf_min = CONF.capi_helm_cluster_labels.min_node_count
+            conf_max = CONF.capi_helm_cluster_labels.max_node_count
             min_nodes = self._get_label_int(
-                cluster, "min_node_count", min_nodes
+                cluster,
+                "min_node_count",
+                conf_min if conf_min is not None else min_nodes,
             )
             max_nodes = self._get_label_int(
-                cluster, "max_node_count", max_nodes
+                cluster,
+                "max_node_count",
+                conf_max if conf_max is not None else max_nodes,
             )
 
         return min_nodes, max_nodes
@@ -780,54 +844,64 @@ class Driver(driver.Driver):
         return self._label(
             cluster,
             "csi_cinder_availability_zone",
-            CONF.capi_helm.csi_cinder_availability_zone,
+            CONF.capi_helm_cluster_labels.csi_cinder_availability_zone,
         )
 
     def _get_csi_cinder_reclaim_policy(self, cluster):
         return self._label(
             cluster,
             "csi_cinder_reclaim_policy",
-            CONF.capi_helm.csi_cinder_reclaim_policy,
+            CONF.capi_helm_cluster_labels.csi_cinder_reclaim_policy,
         )
 
     def _get_csi_cinder_volume_binding_mode(self, cluster):
         return self._label(
             cluster,
             "csi_cinder_volume_binding_mode",
-            CONF.capi_helm.csi_cinder_volume_binding_mode,
+            CONF.capi_helm_cluster_labels.csi_cinder_volume_binding_mode,
         )
 
     def _get_csi_cinder_fstype(self, cluster):
         return self._label(
             cluster,
             "csi_cinder_fstype",
-            CONF.capi_helm.csi_cinder_fstype,
+            CONF.capi_helm_cluster_labels.csi_cinder_fstype,
         )
 
     def _get_csi_cinder_allow_volume_expansion(self, cluster):
         return self._get_label_bool(
             cluster,
             "csi_cinder_allow_volume_expansion",
-            CONF.capi_helm.csi_cinder_allow_volume_expansion,
+            CONF.capi_helm_cluster_labels.csi_cinder_allow_volume_expansion,
         )
 
     def _get_octavia_provider(self, cluster):
-        return self._label(cluster, "octavia_provider", "amphora")
+        return self._label(
+            cluster,
+            "octavia_provider",
+            CONF.capi_helm_cluster_labels.octavia_provider,
+        )
 
     def _get_octavia_lb_algorithm(self, cluster):
         provider = self._get_octavia_provider(cluster)
+        conf_default = CONF.capi_helm_cluster_labels.octavia_lb_algorithm
+        dynamic_default = (
+            "SOURCE_IP_PORT" if provider.lower() == "ovn" else "ROUND_ROBIN"
+        )
         return self._label(
             cluster,
             "octavia_lb_algorithm",
-            "SOURCE_IP_PORT" if provider.lower() == "ovn" else "ROUND_ROBIN",
+            conf_default or dynamic_default,
         )
 
     def _get_allowed_cidrs(self, cluster):
-        cidr_list = cluster.labels.get("api_master_lb_allowed_cidrs", "")
-        LOG.debug(f"CIDR list {cidr_list}")
-        if isinstance(cidr_list, str) and cidr_list != "":
-            return cidr_list.split(",")
-        return False
+        cidrs = self._get_label_csv(
+            cluster,
+            "api_master_lb_allowed_cidrs",
+            CONF.capi_helm_cluster_labels.api_master_lb_allowed_cidrs,
+        )
+        LOG.debug(f"CIDR list {cidrs}")
+        return cidrs or False
 
     def _storageclass_definitions(self, context, cluster):
         """Query cinder API to retrieve list of available volume types.
@@ -908,6 +982,7 @@ class Driver(driver.Driver):
         return nodegroup_set
 
     def _update_helm_release(self, context, cluster, nodegroups=None):
+        lconf = CONF.capi_helm_cluster_labels
         if nodegroups is None:
             nodegroups = cluster.nodegroups
 
@@ -930,7 +1005,7 @@ class Driver(driver.Driver):
                 "associateFloatingIP": self._get_label_bool(
                     cluster,
                     "master_lb_floating_ip_enabled",
-                    True,
+                    lconf.master_lb_floating_ip_enabled,
                 ),
                 "enableLoadBalancer": True,
                 "loadBalancerProvider": self._get_octavia_provider(cluster),
@@ -947,7 +1022,9 @@ class Driver(driver.Driver):
                     "subnetFilter": ({"id": subnet_id} if subnet_id else None),
                     # This is only used if a fixed network is not specified
                     "nodeCidr": self._label(
-                        cluster, "fixed_subnet_cidr", "10.0.0.0/24"
+                        cluster,
+                        "fixed_subnet_cidr",
+                        lconf.fixed_subnet_cidr,
                     ),
                 },
             },
@@ -977,7 +1054,9 @@ class Driver(driver.Driver):
                                 cluster
                             ),
                             "create-monitor": self._get_label_bool(
-                                cluster, "octavia_lb_healthcheck", True
+                                cluster,
+                                "octavia_lb_healthcheck",
+                                lconf.octavia_lb_healthcheck,
                             ),
                         }
                     },
@@ -997,7 +1076,9 @@ class Driver(driver.Driver):
         # Add boot disk details, if defined in config file.
         # Helm chart defaults to ephemeral disks, if unset.
         boot_volume_type = self._label(
-            cluster, "boot_volume_type", CONF.cinder.default_boot_volume_type
+            cluster,
+            "boot_volume_type",
+            lconf.boot_volume_type or CONF.cinder.default_boot_volume_type,
         )
         if boot_volume_type:
             disk_type_details = {
@@ -1014,8 +1095,15 @@ class Driver(driver.Driver):
             }
             values = helm.mergeconcat(values, disk_type_details)
 
+        conf_boot_size = lconf.boot_volume_size
         boot_volume_size_gb = self._get_label_int(
-            cluster, "boot_volume_size", CONF.cinder.default_boot_volume_size
+            cluster,
+            "boot_volume_size",
+            (
+                conf_boot_size
+                if conf_boot_size is not None
+                else CONF.cinder.default_boot_volume_size
+            ),
         )
         if boot_volume_size_gb:
             disk_size_details = {
@@ -1034,7 +1122,11 @@ class Driver(driver.Driver):
 
         # Sometimes you need to add an extra network
         # for things like Cinder CSI CephFS Native
-        extra_network_name = self._label(cluster, "extra_network_name", "")
+        extra_network_name = self._label(
+            cluster,
+            "extra_network_name",
+            lconf.extra_network_name,
+        )
         if extra_network_name:
             network_details = {
                 "nodeGroupDefaults": {

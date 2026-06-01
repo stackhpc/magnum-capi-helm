@@ -967,24 +967,39 @@ class ClusterAPIDriverTest(base.DbTestCase):
         self.cluster_obj.labels = dict()
         self.cluster_obj.cluster_template.labels = dict()
 
-        result = self.driver._label(self.cluster_obj, "foo", "bar")
+        result = self.driver._label(
+            self.cluster_obj, "monitoring_enabled", "bar"
+        )
 
         self.assertEqual("bar", result)
 
     def test_label_return_template(self):
-        self.cluster_obj.cluster_template.labels = dict(foo=42)
+        self.cluster_obj.cluster_template.labels = dict(monitoring_enabled=42)
 
-        result = self.driver._label(self.cluster_obj, "foo", "bar")
+        result = self.driver._label(
+            self.cluster_obj, "monitoring_enabled", "bar"
+        )
 
         self.assertEqual("42", result)
 
     def test_label_return_cluster(self):
-        self.cluster_obj.labels = dict(foo=41)
-        self.cluster_obj.cluster_template.labels = dict(foo=42)
+        self.cluster_obj.labels = dict(monitoring_enabled=41)
+        self.cluster_obj.cluster_template.labels = dict(monitoring_enabled=42)
 
-        result = self.driver._label(self.cluster_obj, "foo", "bar")
+        result = self.driver._label(
+            self.cluster_obj, "monitoring_enabled", "bar"
+        )
 
         self.assertEqual("41", result)
+
+    def test_label_unregistered_key_raises(self):
+        self.assertRaises(
+            ValueError,
+            self.driver._label,
+            self.cluster_obj,
+            "not_a_real_label",
+            "default",
+        )
 
     def test_sanitized_name_no_suffix(self):
         self.assertEqual(
@@ -2020,7 +2035,9 @@ class ClusterAPIDriverTest(base.DbTestCase):
     @mock.patch("magnum.common.clients.OpenStackClients.cinder")
     def test_get_storage_classes(self, mock_cinder):
         CONF.capi_helm.csi_cinder_default_volume_type = "type3"
-        CONF.capi_helm.csi_cinder_availability_zone = "middle_earth_east"
+        CONF.capi_helm_cluster_labels.csi_cinder_availability_zone = (
+            "middle_earth_east"
+        )
         mock_vol_type_1 = mock.MagicMock()
         mock_vol_type_1.name = "type1"
         mock_vol_type_2 = mock.MagicMock()
@@ -2055,7 +2072,9 @@ class ClusterAPIDriverTest(base.DbTestCase):
     @mock.patch("magnum.common.clients.OpenStackClients.cinder")
     def test_get_storage_class_volume_type_not_available(self, mock_cinder):
         CONF.capi_helm.csi_cinder_default_volume_type = "type4"
-        CONF.capi_helm.csi_cinder_availability_zone = "middle_earth_east"
+        CONF.capi_helm_cluster_labels.csi_cinder_availability_zone = (
+            "middle_earth_east"
+        )
         mock_vol_type_1 = mock.MagicMock()
         mock_vol_type_1.name = "type1"
         mock_vol_type_2 = mock.MagicMock()
@@ -2082,7 +2101,9 @@ class ClusterAPIDriverTest(base.DbTestCase):
     @mock.patch("magnum.common.clients.OpenStackClients.cinder")
     def test_get_storage_class_volume_type_not_defined(self, mock_cinder):
         CONF.capi_helm.csi_cinder_default_volume_type = None
-        CONF.capi_helm.csi_cinder_availability_zone = "middle_earth_east"
+        CONF.capi_helm_cluster_labels.csi_cinder_availability_zone = (
+            "middle_earth_east"
+        )
         mock_vol_type_1 = mock.MagicMock()
         mock_vol_type_1.name = "__TYPE1__"
         mock_vol_type_2 = mock.MagicMock()
@@ -2108,7 +2129,9 @@ class ClusterAPIDriverTest(base.DbTestCase):
     @mock.patch("magnum.common.clients.OpenStackClients.cinder")
     def test_get_storage_classes_openstacksdk(self, mock_cinder):
         CONF.capi_helm.csi_cinder_default_volume_type = "type3"
-        CONF.capi_helm.csi_cinder_availability_zone = "middle_earth_east"
+        CONF.capi_helm_cluster_labels.csi_cinder_availability_zone = (
+            "middle_earth_east"
+        )
         mock_vol_type_1 = mock.MagicMock()
         mock_vol_type_1.name = "type1"
         mock_vol_type_2 = mock.MagicMock()
@@ -2145,7 +2168,9 @@ class ClusterAPIDriverTest(base.DbTestCase):
         self, mock_cinder
     ):
         CONF.capi_helm.csi_cinder_default_volume_type = "type4"
-        CONF.capi_helm.csi_cinder_availability_zone = "middle_earth_east"
+        CONF.capi_helm_cluster_labels.csi_cinder_availability_zone = (
+            "middle_earth_east"
+        )
         mock_vol_type_1 = mock.MagicMock()
         mock_vol_type_1.name = "type1"
         mock_vol_type_2 = mock.MagicMock()
@@ -2174,7 +2199,9 @@ class ClusterAPIDriverTest(base.DbTestCase):
         self, mock_cinder
     ):
         CONF.capi_helm.csi_cinder_default_volume_type = None
-        CONF.capi_helm.csi_cinder_availability_zone = "middle_earth_east"
+        CONF.capi_helm_cluster_labels.csi_cinder_availability_zone = (
+            "middle_earth_east"
+        )
         mock_vol_type_1 = mock.MagicMock()
         mock_vol_type_1.name = "__TYPE1__"
         mock_vol_type_2 = mock.MagicMock()
@@ -3696,3 +3723,50 @@ class ClusterAPIDriverTest(base.DbTestCase):
             fields.ClusterStatus.UPDATE_FAILED, self.cluster_obj.status
         )
         self.assertIsNotNone(self.cluster_obj.status_reason)
+
+
+class TestClusterLabelRegistry(base.DbTestCase):
+    """Enforce that every label key used in the driver is registered."""
+
+    def test_all_label_calls_use_registered_keys(self):
+        import ast
+        import inspect
+
+        from magnum_capi_helm import conf as capi_conf
+        from magnum_capi_helm import driver as capi_driver
+
+        registered = frozenset(
+            opt.name for opt in capi_conf.capi_helm_cluster_labels_opts
+        )
+        source = inspect.getsource(capi_driver)
+        tree = ast.parse(source)
+
+        label_methods = {
+            "_label",
+            "_get_label_bool",
+            "_get_label_int",
+            "_get_label_csv",
+        }
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            if not (
+                isinstance(func, ast.Attribute) and func.attr in label_methods
+            ):
+                continue
+            # second positional arg (index 1) is the label key
+            if len(node.args) < 2:
+                continue
+            key_node = node.args[1]
+            # Variable keys (e.g. inside _get_label_bool forwarding to
+            # _label) are validated at runtime; only check string literals.
+            if not isinstance(key_node, ast.Constant):
+                continue
+            self.assertIn(
+                key_node.value,
+                registered,
+                f"Label '{key_node.value}' used at line {node.lineno} "
+                "is not registered in capi_helm_cluster_labels_opts. "
+                "Add it to conf.py before using it in the driver.",
+            )
