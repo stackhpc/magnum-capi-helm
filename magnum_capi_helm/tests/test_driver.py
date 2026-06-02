@@ -3735,9 +3735,17 @@ class TestClusterLabelRegistry(base.DbTestCase):
         from magnum_capi_helm import conf as capi_conf
         from magnum_capi_helm import driver as capi_driver
 
-        registered = frozenset(
+        regular_label_names = set(
             opt.name for opt in capi_conf.capi_helm_cluster_labels_opts
         )
+        deprecated_label_names = []
+        for opt in capi_conf.capi_helm_cluster_labels_opts:
+            for dep_opt in opt.deprecated_opts:
+                deprecated_label_names.append(dep_opt.name)
+        registered = frozenset(
+            regular_label_names.union(set(deprecated_label_names))
+        )
+
         source = inspect.getsource(capi_driver)
         tree = ast.parse(source)
 

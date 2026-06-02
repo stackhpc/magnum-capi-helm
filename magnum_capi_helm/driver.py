@@ -38,9 +38,19 @@ LOG = logging.getLogger(__name__)
 CONF = conf.CONF
 NODE_GROUP_ROLE_CONTROLLER = "master"
 
-_REGISTERED_LABEL_NAMES = frozenset(
-    opt.name for opt in conf.capi_helm_cluster_labels_opts
-)
+
+def _gather_label_names():
+    regular_label_names = set(
+        opt.name for opt in conf.capi_helm_cluster_labels_opts
+    )
+    deprecated_label_names = []
+    for opt in conf.capi_helm_cluster_labels_opts:
+        for dep_opt in opt.deprecated_opts:
+            deprecated_label_names.append(dep_opt.name)
+    return frozenset(regular_label_names.union(set(deprecated_label_names)))
+
+
+_REGISTERED_LABEL_NAMES = _gather_label_names()
 
 
 class NodeGroupState(enum.Enum):
