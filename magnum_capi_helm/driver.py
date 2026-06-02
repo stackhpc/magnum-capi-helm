@@ -1132,24 +1132,36 @@ class Driver(driver.Driver):
 
         # Sometimes you need to add an extra network
         # for things like Cinder CSI CephFS Native
+        # NOTE(mattcrees): extra_network_name is deprecated, so
+        # extra_network_names takes precedence if both are set.
+        # extra_network_name should be removed in a future release.
         extra_network_name = self._label(
             cluster,
             "extra_network_name",
-            lconf.extra_network_name,
+            "",
         )
-        if extra_network_name:
+        extra_network_names = self._label(
+            cluster,
+            "extra_network_names",
+            lconf.extra_network_names,
+        )
+        if extra_network_name and not extra_network_names:
+            extra_network_names = extra_network_name
+        if extra_network_names:
+            ports = [{}]
+            for network in extra_network_names.split(" "):
+                ports.append(
+                    {
+                        "network": {
+                            "name": network,
+                        },
+                        "securityGroups": [],
+                    }
+                )
             network_details = {
                 "nodeGroupDefaults": {
                     "machineNetworking": {
-                        "ports": [
-                            {},
-                            {
-                                "network": {
-                                    "name": extra_network_name,
-                                },
-                                "securityGroups": [],
-                            },
-                        ],
+                        "ports": ports,
                     },
                 },
             }

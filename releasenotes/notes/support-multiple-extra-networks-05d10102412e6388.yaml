@@ -1,0 +1,10 @@
+---
+features:
+  - |
+    Adds support for attaching multiple extra networks to a cluster, via the
+    label ``extra_network_names``. This label takes a space separated list of
+    network names.
+deprecations:
+  - |
+    The label ``extra_network_name`` is deprecated in favor of
+    ``extra_network_names``.

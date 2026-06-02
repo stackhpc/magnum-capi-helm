@@ -325,9 +325,17 @@ capi_helm_cluster_labels_opts = [
         ),
     ),
     cfg.StrOpt(
-        "extra_network_name",
+        "extra_network_names",
         default="",
-        help="Name of an additional Neutron network to attach to each node.",
+        deprecated_opts=[
+            cfg.DeprecatedOpt(
+                "extra_network_name", group="capi_helm_cluster_labels"
+            )
+        ],
+        help=(
+            "Space separated list of names of additional Neutron networks "
+            "to attach to each node."
+        ),
     ),
     # boot volume
     cfg.StrOpt(

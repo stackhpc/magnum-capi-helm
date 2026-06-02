@@ -1485,7 +1485,7 @@ class ClusterAPIDriverTest(base.DbTestCase):
     @mock.patch.object(kubernetes.Client, "load", autospec=True)
     @mock.patch.object(driver.Driver, "_get_image_details", autospec=True)
     @mock.patch.object(helm.Client, "install_or_upgrade", autospec=True)
-    def test_create_cluster_boot_volume_extra_network(
+    def test_create_cluster_boot_volume_extra_networks(
         self,
         mock_install,
         mock_image,
@@ -1508,7 +1508,9 @@ class ClusterAPIDriverTest(base.DbTestCase):
         CONF.cinder.default_boot_volume_type = "nvme"
         CONF.cinder.default_boot_volume_size = 12
         # Driver should combine boot volume with extra network.
-        self.cluster_obj.cluster_template.labels["extra_network_name"] = "foo"
+        self.cluster_obj.cluster_template.labels["extra_network_names"] = (
+            "foo bar"
+        )
 
         self.driver.create_cluster(self.context, self.cluster_obj, 10)
 
@@ -1527,6 +1529,12 @@ class ClusterAPIDriverTest(base.DbTestCase):
                 {
                     "network": {
                         "name": "foo",
+                    },
+                    "securityGroups": [],
+                },
+                {
+                    "network": {
+                        "name": "bar",
                     },
                     "securityGroups": [],
                 },
