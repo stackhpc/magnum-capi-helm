@@ -80,22 +80,6 @@ capi_helm_opts = [
         "csi_cinder_default_volume_type",
         help=("Default StorageClass volume type for persistent volumes."),
     ),
-    cfg.StrOpt(
-        "csi_cinder_reclaim_policy",
-        default="Retain",
-        help=(
-            "Policy for reclaiming dynamically created "
-            "persistent volumes. Can be 'Retain' or 'Delete'."
-        ),
-    ),
-    cfg.BoolOpt(
-        "csi_cinder_allow_volume_expansion",
-        default=True,
-        help=(
-            "Allows the users to resize the volume by "
-            "editing the corresponding PVC object."
-        ),
-    ),
     cfg.ListOpt(
         "csi_cinder_allowed_topologies",
         default=[],
@@ -103,25 +87,6 @@ capi_helm_opts = [
             "Select the Nodes where the application "
             "Pods may be scheduled based on Node labels."
         ),
-    ),
-    cfg.StrOpt(
-        "csi_cinder_fstype",
-        default="ext4",
-        help=("Filesystem type for persistent volumes."),
-    ),
-    cfg.StrOpt(
-        "csi_cinder_volume_binding_mode",
-        default="WaitForFirstConsumer",
-        choices=["WaitForFirstConsumer", "Immediate"],
-        help=(
-            "The volumeBindingMode field controls when "
-            "volume binding and dynamic provisioning should occur."
-        ),
-    ),
-    cfg.StrOpt(
-        "csi_cinder_availability_zone",
-        default="nova",
-        help=("The default availability zone to use for Cinder volumes."),
     ),
     cfg.StrOpt(
         "app_cred_interface_type",
@@ -172,10 +137,244 @@ capi_helm_opts = [
     ),
 ]
 
+capi_helm_cluster_labels_group = cfg.OptGroup(
+    name="capi_helm_cluster_labels",
+    title="Default values for cluster labels",
+)
+
+capi_helm_cluster_labels_opts = [
+    # etcd
+    cfg.IntOpt(
+        "etcd_blockdevice_size",
+        default=0,
+        help=(
+            "Size of the etcd block device in GB. "
+            "0 means use the default ephemeral disk."
+        ),
+    ),
+    cfg.StrOpt(
+        "etcd_blockdevice_type",
+        default="volume",
+        choices=["volume", "local"],
+        help=(
+            "Storage type for the etcd block device. "
+            "'volume' uses a Cinder volume; 'local' uses an ephemeral disk."
+        ),
+    ),
+    cfg.StrOpt(
+        "etcd_blockdevice_volume_type",
+        default="",
+        help="Cinder volume type for the etcd block device.",
+    ),
+    cfg.StrOpt(
+        "etcd_blockdevice_volume_az",
+        default="",
+        help="Availability zone for the etcd Cinder volume.",
+    ),
+    cfg.IntOpt(
+        "etcd_volume_size",
+        default=0,
+        deprecated_opts=[
+            cfg.DeprecatedOpt("etcd_volume_size", group="capi_helm")
+        ],
+        help="Deprecated: use etcd_blockdevice_size instead.",
+    ),
+    cfg.StrOpt(
+        "etcd_volume_type",
+        default="",
+        deprecated_opts=[
+            cfg.DeprecatedOpt("etcd_volume_type", group="capi_helm")
+        ],
+        help="Deprecated: use etcd_blockdevice_volume_type instead.",
+    ),
+    # addons
+    cfg.BoolOpt(
+        "monitoring_enabled",
+        default=False,
+        help="Enable the monitoring addon on the cluster.",
+    ),
+    cfg.BoolOpt(
+        "kube_dashboard_enabled",
+        default=True,
+        help="Enable the Kubernetes Dashboard addon.",
+    ),
+    cfg.BoolOpt(
+        "auto_healing_enabled",
+        default=True,
+        help="Enable auto-healing for cluster nodes.",
+    ),
+    cfg.BoolOpt(
+        "auto_scaling_enabled",
+        default=False,
+        help="Enable the cluster autoscaler.",
+    ),
+    cfg.IntOpt(
+        "min_node_count",
+        default=None,
+        help=(
+            "Minimum node count for autoscaling. "
+            "Defaults to the nodegroup node_count when unset."
+        ),
+    ),
+    cfg.IntOpt(
+        "max_node_count",
+        default=None,
+        help=(
+            "Maximum node count for autoscaling. "
+            "Defaults to the nodegroup node_count when unset."
+        ),
+    ),
+    # auth
+    cfg.BoolOpt(
+        "keystone_auth_enabled",
+        default=False,
+        help="Enable the Keystone authentication webhook.",
+    ),
+    # CSI Cinder — moved from [capi_helm], old location still accepted
+    cfg.StrOpt(
+        "csi_cinder_availability_zone",
+        default="nova",
+        deprecated_opts=[
+            cfg.DeprecatedOpt(
+                "csi_cinder_availability_zone", group="capi_helm"
+            )
+        ],
+        help="Default availability zone for Cinder volumes.",
+    ),
+    cfg.StrOpt(
+        "csi_cinder_reclaim_policy",
+        default="Retain",
+        choices=["Retain", "Delete"],
+        deprecated_opts=[
+            cfg.DeprecatedOpt("csi_cinder_reclaim_policy", group="capi_helm")
+        ],
+        help=(
+            "Reclaim policy for dynamically provisioned persistent volumes. "
+            "Can be 'Retain' or 'Delete'."
+        ),
+    ),
+    cfg.StrOpt(
+        "csi_cinder_volume_binding_mode",
+        default="WaitForFirstConsumer",
+        choices=["WaitForFirstConsumer", "Immediate"],
+        deprecated_opts=[
+            cfg.DeprecatedOpt(
+                "csi_cinder_volume_binding_mode", group="capi_helm"
+            )
+        ],
+        help=(
+            "Controls when volume binding and dynamic provisioning occur. "
+            "Can be 'WaitForFirstConsumer' or 'Immediate'."
+        ),
+    ),
+    cfg.StrOpt(
+        "csi_cinder_fstype",
+        default="ext4",
+        deprecated_opts=[
+            cfg.DeprecatedOpt("csi_cinder_fstype", group="capi_helm")
+        ],
+        help="Filesystem type for persistent volumes.",
+    ),
+    cfg.BoolOpt(
+        "csi_cinder_allow_volume_expansion",
+        default=True,
+        deprecated_opts=[
+            cfg.DeprecatedOpt(
+                "csi_cinder_allow_volume_expansion", group="capi_helm"
+            )
+        ],
+        help="Allow users to resize persistent volumes by editing the PVC.",
+    ),
+    # Octavia load balancer
+    cfg.StrOpt(
+        "octavia_provider",
+        default="amphora",
+        help="Octavia load balancer provider (e.g. 'amphora' or 'ovn').",
+    ),
+    cfg.StrOpt(
+        "octavia_lb_algorithm",
+        default="",
+        help=(
+            "Load balancer algorithm. "
+            "When unset, defaults to SOURCE_IP_PORT for the ovn provider "
+            "and ROUND_ROBIN for all others."
+        ),
+    ),
+    cfg.BoolOpt(
+        "octavia_lb_healthcheck",
+        default=True,
+        help="Enable health checks on the load balancer.",
+    ),
+    # networking
+    cfg.BoolOpt(
+        "master_lb_floating_ip_enabled",
+        default=True,
+        help="Associate a floating IP with the API load balancer.",
+    ),
+    cfg.StrOpt(
+        "fixed_subnet_cidr",
+        default="10.0.0.0/24",
+        help="CIDR for the node network when no fixed_subnet is specified.",
+    ),
+    cfg.StrOpt(
+        "api_master_lb_allowed_cidrs",
+        default="",
+        help=(
+            "Comma-separated list of CIDRs allowed to reach the API load "
+            "balancer. Empty means all CIDRs are allowed."
+        ),
+    ),
+    cfg.StrOpt(
+        "extra_network_name",
+        default="",
+        help="Name of an additional Neutron network to attach to each node.",
+    ),
+    # boot volume
+    cfg.StrOpt(
+        "boot_volume_type",
+        default=None,
+        help=(
+            "Root volume type. "
+            "Falls back to the cinder config option "
+            "default_boot_volume_type when unset."
+        ),
+    ),
+    cfg.IntOpt(
+        "boot_volume_size",
+        default=None,
+        help=(
+            "Root volume size in GB. "
+            "Falls back to the cinder config option "
+            "default_boot_volume_size when unset."
+        ),
+    ),
+    # chart version (template-only — cannot be overridden per cluster)
+    cfg.StrOpt(
+        "capi_helm_chart_version",
+        default="",
+        help=(
+            "Helm chart version to use. Can only be set via the cluster "
+            "template label, not overridden per cluster. Falls back to "
+            "capi_helm.default_helm_chart_version when unset."
+        ),
+    ),
+]
+
 CONF = cfg.CONF
 CONF.register_group(capi_helm_group)
 CONF.register_opts(capi_helm_opts, group=capi_helm_group)
+CONF.register_group(capi_helm_cluster_labels_group)
+CONF.register_opts(
+    capi_helm_cluster_labels_opts, group=capi_helm_cluster_labels_group
+)
 
 
 def list_capi_opts():
     return [(capi_helm_group, [o]) for o in capi_helm_opts]
+
+
+def list_capi_cluster_label_opts():
+    return [
+        (capi_helm_cluster_labels_group, [o])
+        for o in capi_helm_cluster_labels_opts
+    ]
