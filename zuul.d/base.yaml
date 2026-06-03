@@ -64,3 +64,9 @@
 - job:
     name: magnum-capi-helm-tests-cluster-calico
     parent: magnum-capi-helm-tests-cluster
+    vars:
+      devstack_local_conf:
+        test-config:
+          $TEMPEST_CONFIG:
+            magnum:
+              network_driver: calico
