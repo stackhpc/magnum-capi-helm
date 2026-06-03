@@ -1,0 +1,8 @@
+---
+features:
+  - |
+    The CNI deployed in clusters can now be selected via the
+    ``network_driver`` cluster template option. The value is passed
+    through to the helm chart as ``addons.cni.type``. Supported values
+    are ``calico`` (default) and ``cilium``. When unset, the helm chart
+    default is used.

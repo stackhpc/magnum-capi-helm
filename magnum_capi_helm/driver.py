@@ -892,6 +892,13 @@ class Driver(driver.Driver):
             CONF.capi_helm_cluster_labels.octavia_provider,
         )
 
+    def _get_cni_type(self, cluster):
+        network_driver = cluster.cluster_template.network_driver
+        if not network_driver:
+            return None
+        # NOTE: filtering untrusted user input
+        return re.sub(r"[^a-zA-Z0-9\.\-_]+", "", network_driver)
+
     def _get_octavia_lb_algorithm(self, cluster):
         provider = self._get_octavia_provider(cluster)
         conf_default = CONF.capi_helm_cluster_labels.octavia_lb_algorithm
@@ -1194,6 +1201,11 @@ class Driver(driver.Driver):
                 "apiServer": {"allowedCidrs": api_lb_allowed_cidrs}
             }
             values = helm.mergeconcat(values, allowed_cidrs_config)
+
+        cni_type = self._get_cni_type(cluster)
+        if cni_type:
+            cni_config = {"addons": {"cni": {"type": cni_type}}}
+            values = helm.mergeconcat(values, cni_config)
 
         self._helm_client.install_or_upgrade(
             driver_utils.chart_release_name(cluster),
