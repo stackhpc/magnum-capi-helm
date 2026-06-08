@@ -1,0 +1,25 @@
+---
+prelude: >
+    The 1.4.0 release introduces many new features and improvements, including:
+
+      * Adds support for the ClusterAPI resource HelmChartProxy.
+
+      * The CNI deployed in clusters can now be selected via the
+        ``network_driver`` cluster template option.
+
+      * Adds support for application credential rotation for workload clusters
+        via the credential API.
+
+      * Adds support for attaching multiple extra networks to a cluster.
+
+      * Adds new configuration parameters to update api_version and plural
+        names of k8s resources related to Cluster API.
+
+      * Adds new configuration parameter to specify list of conditions to check
+        in kubernetes control plane resource to consider resource as ready.
+
+    Operators shoud note that all cluster label defaults are now configurable
+    site-wide via a new ``[capi_helm_cluster_labels]`` section in
+    ``magnum.conf``. Each supported label has a typed option with a default
+    value that users can still override per cluster or template via Magnum
+    labels.
