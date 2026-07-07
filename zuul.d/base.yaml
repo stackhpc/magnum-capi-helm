@@ -2,7 +2,7 @@
 - job:
     name: magnum-capi-helm-tests-cluster
     parent: magnum-tempest-plugin-tests-cluster-base
-    nodeset: magnum-ubuntu-noble-32GB
+    nodeset: magnum-ubuntu-noble-16GB
     pre-run: playbooks/pre.yaml
     post-run: playbooks/post.yaml
     required-projects:
