@@ -1,0 +1,15 @@
+---
+features:
+  - |
+    Worker nodegroups can now be scaled to and from zero when autoscaling
+    is enabled. Set the ``min_node_count`` label to ``0`` to allow the
+    cluster autoscaler to scale a nodegroup down to zero replicas.
+    Requires capi-helm-charts >= 0.26.0 and
+    cluster-api-provider-openstack >= 0.26.0.
+    An explicit error is raised when ``min_node_count=0`` is requested
+    with an older chart version.
+upgrade:
+  - |
+    The default capi-helm-charts version
+    (``[capi_helm] default_helm_chart_version``) has been updated to
+    ``0.26.0``.
