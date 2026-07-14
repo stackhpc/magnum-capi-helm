@@ -514,7 +514,7 @@ class Driver(driver.Driver):
             return default
         raw = all_labels.get(key, default)
         # NOTE(johngarbutt): filtering untrusted user input
-        return re.sub(r"[^a-zA-Z0-9\.\-\/ _]+", "", raw)
+        return re.sub(r"[^a-zA-Z0-9\.\-\/\: _]+", "", raw)
 
     def _get_label_bool(self, cluster, label, default):
         cluster_label = self._label(cluster, label, "")
@@ -572,6 +572,56 @@ class Driver(driver.Driver):
             self._parse_chart_version(version)
             >= SCALE_TO_ZERO_MIN_CHART_VERSION
         )
+
+    def _get_nvidia_gpu_operator_config(self, cluster):
+        lconf = CONF.capi_helm_cluster_labels
+        config = {}
+
+        enabled_default = lconf.nvidia_gpu_operator_enabled
+        enabled_raw = self._label(
+            cluster,
+            "nvidia_gpu_operator_enabled",
+            "" if enabled_default is None else str(enabled_default),
+        )
+        if enabled_raw != "":
+            config["enabled"] = strutils.bool_from_string(enabled_raw)
+
+        chart = {}
+        chart_labels = {
+            "repo": "nvidia_gpu_operator_chart_repo",
+            "name": "nvidia_gpu_operator_chart_name",
+            "version": "nvidia_gpu_operator_chart_version",
+        }
+        for key, label in chart_labels.items():
+            value = self._label(cluster, label, getattr(lconf, label))
+            if value:
+                chart[key] = value
+        if chart:
+            config["chart"] = chart
+
+        driver_values = {}
+        driver_labels = {
+            "repository": "nvidia_gpu_operator_driver_repository",
+            "image": "nvidia_gpu_operator_driver_image",
+            "version": "nvidia_gpu_operator_driver_version",
+        }
+        for key, label in driver_labels.items():
+            value = self._label(cluster, label, getattr(lconf, label))
+            if value:
+                driver_values[key] = value
+
+        image_pull_secrets = self._get_label_csv(
+            cluster,
+            "nvidia_gpu_operator_driver_image_pull_secrets",
+            lconf.nvidia_gpu_operator_driver_image_pull_secrets,
+        )
+        if image_pull_secrets:
+            driver_values["imagePullSecrets"] = image_pull_secrets
+
+        if driver_values:
+            config["release"] = {"values": {"driver": driver_values}}
+
+        return config
 
     def _get_kube_version(self, image):
         # The image should have a property containing the Kubernetes version.
@@ -1232,6 +1282,17 @@ class Driver(driver.Driver):
         if cni_type:
             cni_config = {"addons": {"cni": {"type": cni_type}}}
             values = helm.mergeconcat(values, cni_config)
+
+        nvidia_gpu_operator_config = self._get_nvidia_gpu_operator_config(
+            cluster
+        )
+        if nvidia_gpu_operator_config:
+            nvidia_gpu_operator_values = {
+                "addons": {
+                    "nvidiaGPUOperator": nvidia_gpu_operator_config,
+                },
+            }
+            values = helm.mergeconcat(values, nvidia_gpu_operator_values)
 
         self._helm_client.install_or_upgrade(
             driver_utils.chart_release_name(cluster),

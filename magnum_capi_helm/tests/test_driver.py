@@ -1200,6 +1200,48 @@ class ClusterAPIDriverTest(base.DbTestCase):
 
         self.assertEqual("1.42.0", version)
 
+    def test_get_nvidia_gpu_operator_config_empty_by_default(self):
+        config = self.driver._get_nvidia_gpu_operator_config(self.cluster_obj)
+
+        self.assertEqual({}, config)
+
+    def test_get_nvidia_gpu_operator_config_from_labels(self):
+        self.cluster_obj.labels = {
+            "nvidia_gpu_operator_enabled": "true",
+            "nvidia_gpu_operator_chart_version": "v26.3.2",
+            "nvidia_gpu_operator_driver_repository": (
+                "registry.example.com/gpu"
+            ),
+            "nvidia_gpu_operator_driver_image": "custom-driver",
+            "nvidia_gpu_operator_driver_version": "1.2.3-ubuntu22.04",
+            "nvidia_gpu_operator_driver_image_pull_secrets": (
+                "registry-creds,nvidia-creds"
+            ),
+        }
+
+        config = self.driver._get_nvidia_gpu_operator_config(self.cluster_obj)
+
+        self.assertEqual(
+            {
+                "enabled": True,
+                "chart": {"version": "v26.3.2"},
+                "release": {
+                    "values": {
+                        "driver": {
+                            "repository": "registry.example.com/gpu",
+                            "image": "custom-driver",
+                            "version": "1.2.3-ubuntu22.04",
+                            "imagePullSecrets": [
+                                "registry-creds",
+                                "nvidia-creds",
+                            ],
+                        }
+                    }
+                },
+            },
+            config,
+        )
+
     def _get_cluster_helm_standard_values(self):
         """Return standard helm values which can be modified for tests.
 
@@ -1332,6 +1374,74 @@ class ClusterAPIDriverTest(base.DbTestCase):
             self.driver, self.context, self.cluster_obj
         )
         self.assertEqual([], mock_get_net.call_args_list)
+
+    @mock.patch.object(driver.Driver, "_get_allowed_cidrs")
+    @mock.patch.object(
+        driver.Driver,
+        "_get_k8s_keystone_auth_enabled",
+        return_value=False,
+    )
+    @mock.patch.object(
+        driver.Driver,
+        "_storageclass_definitions",
+        return_value=mock.ANY,
+    )
+    @mock.patch.object(driver.Driver, "_validate_allowed_flavor")
+    @mock.patch.object(neutron, "get_network", autospec=True)
+    @mock.patch.object(
+        driver.Driver, "_ensure_certificate_secrets", autospec=True
+    )
+    @mock.patch.object(driver.Driver, "_create_appcred_secret", autospec=True)
+    @mock.patch.object(kubernetes.Client, "load", autospec=True)
+    @mock.patch.object(driver.Driver, "_get_image_details", autospec=True)
+    @mock.patch.object(helm.Client, "install_or_upgrade", autospec=True)
+    def test_create_cluster_nvidia_gpu_operator_overrides(
+        self,
+        mock_install,
+        mock_image,
+        mock_load,
+        mock_appcred,
+        mock_certs,
+        mock_get_net,
+        mock_validate_allowed_flavor,
+        mock_storageclasses,
+        mock_get_keystone_auth_enabled,
+        mock_get_allowed_cidrs,
+    ):
+        mock_image.return_value = (
+            "imageid1",
+            "1.27.4",
+            "ubuntu",
+        )
+        mock_load.return_value = mock.MagicMock(spec=kubernetes.Client)
+        self.cluster_obj.labels = {
+            "nvidia_gpu_operator_chart_version": "v26.3.2",
+            "nvidia_gpu_operator_driver_repository": (
+                "registry.example.com/gpu"
+            ),
+            "nvidia_gpu_operator_driver_image": "custom-driver",
+            "nvidia_gpu_operator_driver_version": "1.2.3-ubuntu22.04",
+        }
+
+        self.driver.create_cluster(self.context, self.cluster_obj, 10)
+
+        helm_install_values = mock_install.call_args[0][3]
+        self.assertEqual(
+            "v26.3.2",
+            helm_install_values["addons"]["nvidiaGPUOperator"]["chart"][
+                "version"
+            ],
+        )
+        self.assertEqual(
+            {
+                "repository": "registry.example.com/gpu",
+                "image": "custom-driver",
+                "version": "1.2.3-ubuntu22.04",
+            },
+            helm_install_values["addons"]["nvidiaGPUOperator"]["release"][
+                "values"
+            ]["driver"],
+        )
 
     @mock.patch.object(driver.Driver, "_get_allowed_cidrs")
     @mock.patch.object(

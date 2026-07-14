@@ -208,6 +208,70 @@ capi_helm_cluster_labels_opts = [
         default=False,
         help="Enable the cluster autoscaler.",
     ),
+    cfg.BoolOpt(
+        "nvidia_gpu_operator_enabled",
+        default=None,
+        help=(
+            "Enable or disable the NVIDIA GPU Operator addon. When unset, "
+            "the Helm chart default is used."
+        ),
+    ),
+    cfg.StrOpt(
+        "nvidia_gpu_operator_chart_repo",
+        default="",
+        help=(
+            "Helm repository URL for the NVIDIA GPU Operator chart. "
+            "When unset, the Helm chart default is used."
+        ),
+    ),
+    cfg.StrOpt(
+        "nvidia_gpu_operator_chart_name",
+        default="",
+        help=(
+            "Name of the NVIDIA GPU Operator chart. When unset, the Helm "
+            "chart default is used."
+        ),
+    ),
+    cfg.StrOpt(
+        "nvidia_gpu_operator_chart_version",
+        default="",
+        help=(
+            "Version of the NVIDIA GPU Operator chart. When unset, the Helm "
+            "chart default is used."
+        ),
+    ),
+    cfg.StrOpt(
+        "nvidia_gpu_operator_driver_repository",
+        default="",
+        help=(
+            "Repository for a custom NVIDIA driver image used by the GPU "
+            "Operator. When unset, the GPU Operator chart default is used."
+        ),
+    ),
+    cfg.StrOpt(
+        "nvidia_gpu_operator_driver_image",
+        default="",
+        help=(
+            "Image name for a custom NVIDIA driver image used by the GPU "
+            "Operator. When unset, the GPU Operator chart default is used."
+        ),
+    ),
+    cfg.StrOpt(
+        "nvidia_gpu_operator_driver_version",
+        default="",
+        help=(
+            "Tag for a custom NVIDIA driver image used by the GPU Operator. "
+            "When unset, the GPU Operator chart default is used."
+        ),
+    ),
+    cfg.StrOpt(
+        "nvidia_gpu_operator_driver_image_pull_secrets",
+        default="",
+        help=(
+            "Comma-separated list of image pull secret names for the NVIDIA "
+            "driver image. When unset, the GPU Operator chart default is used."
+        ),
+    ),
     cfg.IntOpt(
         "min_node_count",
         default=None,
